@@ -1,7 +1,5 @@
 # computational-OT
 
-# FreeDeconvolution
-
 ## Content
 
 The repository is structured as follows. We only describe the most important files for a new user.
