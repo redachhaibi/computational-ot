@@ -12,8 +12,8 @@ class LinearOptimize:
   
   def solve(self):
     P = cp.Variable((self.N1,self.N2))
-    v = np.ones((self.N2,a.shape[1]))
-    u = np.ones((self.N1,b.shape[1]))
+    v = np.ones((self.N2,self.a.shape[1]))
+    u = np.ones((self.N1,self.b.shape[1]))
     
     U = [0 <= P, cp.matmul(P,v)==self.a, cp.matmul(P.T,u)==self.b]
 
