@@ -6,8 +6,11 @@ The repository is structured as follows. We only describe the most important fil
 ```bash
 ./
 |-- computational-OT: Core of package. 
-|  |-- sinkhorn.py    : Sinkhorn iterations
 |  |-- grad_ascent.py : Gradient ascent
+|  |-- L_BFGS_B.py    : BFGS is the goto quasi-Newton method
+|  |-- linear.py      : Linear programming using cvxpy
+|  |-- linesearch.py  : Gradient ascent with line search using Armijo condition
+|  |-- sinkhorn.py    : Sinkhorn iterations
 |-- ipynb: Contains Python notebooks which demonstrate how the code works
 |  |-- Demo.ipynb: Illustrates the various methods, in particular, Sinkhorn, Gradient ascent (fixed or line search), L-BGFS, Newton...
 |  |-- Multiscale.ipynb: Exploring multiscale resolution
