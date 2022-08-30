@@ -1,3 +1,4 @@
+from turtle import pen
 import numpy as np
 from numpy import linalg as Lin
 
@@ -19,7 +20,9 @@ class Sinkhorn:
         """Computes the value of the objective function at x"""
         f=np.log(self.u)*self.epsilon
         g=np.log(self.v)*self.epsilon
-        return np.dot(f.T,self.a)+np.dot(g.T,self.b)-self.epsilon*np.dot(np.exp(f/self.epsilon).T,np.dot(self.K,np.exp(g/self.epsilon)))
+        target=np.dot(f.T,self.a)+np.dot(g.T,self.b)
+        penalization=-self.epsilon*np.dot(np.exp(f/self.epsilon).T,np.dot(self.K,np.exp(g/self.epsilon)))
+        return target, penalization
 
 
   def _update(self, tol=1e-12, maxiter=1000):
