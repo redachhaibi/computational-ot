@@ -28,6 +28,8 @@ class Sinkhorn:
   def _update(self, tol=1e-12, maxiter=1000):
     i=0
     while True :
+      self.obj.append(self._objectivefunction())
+
       # sinkhorn step 1
       self.u = self.a / np.dot( self.K, self.v )
       
@@ -41,7 +43,6 @@ class Sinkhorn:
       # error computation 2
       s = self.u*np.dot( self.K, self.v )
       self.err_a.append(Lin.norm(s - self.a))
-      self.obj.append(self._objectivefunction())
     
       if i<maxiter and (self.err_a[-1]>tol or self.err_b[-1]>tol) :
           i+=1
