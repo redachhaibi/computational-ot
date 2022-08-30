@@ -9,7 +9,7 @@ print("")
 print("Launching setup...")
 # Setup
 setup(
-    name='computational-OT',
+    name='computational_OT',
 
     version='0.01',
 
@@ -25,7 +25,7 @@ setup(
 
     license='MIT License',
 
-    install_requires=["numpy", "matplotlib"],
+    install_requires=["numpy", "matplotlib", "scipy", "cvxpy", "sklearn"],
 
     keywords='',
 
