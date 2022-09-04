@@ -1,11 +1,10 @@
-from turtle import pen
 import numpy as np
 from numpy import linalg as Lin
 
 
 class Sinkhorn:
 
-  def __init__(self,N,K,a,b,u,v,epsilon):
+  def __init__(self,K,a,b,u,v,epsilon):
     self.K=K
     self.a=a
     self.b=b
@@ -22,7 +21,7 @@ class Sinkhorn:
         g=np.log(self.v)*self.epsilon
         target=np.dot(f.T,self.a)+np.dot(g.T,self.b)
         penalization=-self.epsilon*np.dot(np.exp(f/self.epsilon).T,np.dot(self.K,np.exp(g/self.epsilon)))
-        return target, penalization
+        return target+ penalization
 
 
   def _update(self, tol=1e-12, maxiter=1000):
@@ -43,11 +42,12 @@ class Sinkhorn:
       # error computation 2
       s = self.u*np.dot( self.K, self.v )
       self.err_a.append(Lin.norm(s - self.a))
-    
-      if i<maxiter and (self.err_a[-1]>tol or self.err_b[-1]>tol) :
+
+      iter_condition=(self.err_a[-1]>tol or self.err_b[-1]>tol)
+      if iter_condition and i<maxiter :
           i+=1
       else:
-        break
+        break   
     # end for
     return self.u,self.v,self.err_a,self.err_b,self.obj
     
