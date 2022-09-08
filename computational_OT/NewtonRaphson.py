@@ -43,31 +43,52 @@ class NewtonRaphson:
         C = P.T
         D = np.diag( r2 )
         result = np.vstack( ( np.hstack((A,B)), np.hstack((C,D)) ) )/self.epsilon
+        
+        # Inflating the corresponding direction
+        resultstabilized = result + np.dot( eig_vector, eig_vector.T)
         # Conjecture: Smallest eigenvalue in absolute value has eigenvector approx (\mathds{1}_n, -\mathds{1}_m)
         if debug:
             eig, v = np.linalg.eig( result )
-            min_index = np.argmin( np.abs(eig) )
+            min_index = np.argmin(np.abs(eig))
+            max_index=np.argmax(np.abs(eig))
             min_value = eig[ min_index ]
+            max_value=eig[max_index]
             min_vector = v[:, min_index]
             min_vector = min_vector/min_vector[0]
-            #
+            max_vector=v[:,max_index]
+            max_vector=max_vector/max_vector[0]
+            condition_number1=max_value/min_value
+             #
             print("Min absolute eigenvalues: ", min_value)
             print("Norm of v-1: ", np.linalg.norm(min_vector-eig_vector))
+            print("Condtion number without stabilizer: ", condition_number1)
+
+            
+            eig, v = np.linalg.eig( resultstabilized )
+            min_index = np.argmin(np.abs(eig))
+            max_index=np.argmax(np.abs(eig))
+            min_value = eig[ min_index ]
+            max_value=eig[max_index]
+            min_vector = v[:, min_index]
+            min_vector = min_vector/min_vector[0]
+            max_vector=v[:,max_index]
+            max_vector=max_vector/max_vector[0]
+            condition_number2=max_value/min_value
+            print("Condtion number with stabilizer: ", condition_number2)
+
             print("")
-        # Inflating the corresponding direction
-        result = result + np.dot( eig_vector, eig_vector.T)
         return result
     
-    def _update(self,maxiter=200,tol=1e-15):
+    def _update(self,maxiter=200,tol=1e-15,debug=False):
         i=0
         while True:
             target   = self._func_phi()
-            jacobian = self._func_jacobian()
+            jacobian = self._func_jacobian(debug)
             e = [np.linalg.norm( target[:self.N1]),np.linalg.norm( target[self.N1:])]
             self.x=self.x - np.linalg.solve( jacobian, target )
             # inv_jac  = np.linalg.inv( jacobian)
             # x = x - np.dot( inv_jac, target )
-            self.err_a.append( e[0])
+            self.err_a.append(e[0])
             self.err_b.append(e[1])
 
             iter_condition=(e[0]>tol or e[1]>tol)
@@ -75,7 +96,6 @@ class NewtonRaphson:
                 i+=1
             else:
                 break
-
         return self.err_a,self.err_b
 
         
