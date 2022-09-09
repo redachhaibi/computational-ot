@@ -24,6 +24,7 @@ class NewtonRaphson:
 
     def _func_jacobian(self, debug=False):
         eig_vector = np.hstack( (np.ones(self.N1), -np.ones(self.N2)) )/np.sqrt( self.N1 + self.N2)
+        eig_vector = np.reshape( eig_vector, (self.N1 + self.N2, 1) )
 
         y = np.exp(self.x/self.epsilon)
         u = y[:self.N1]
@@ -48,23 +49,39 @@ class NewtonRaphson:
         resultstabilized = result + np.dot( eig_vector, eig_vector.T)
         # Conjecture: Smallest eigenvalue in absolute value has eigenvector approx (\mathds{1}_n, -\mathds{1}_m)
         if debug:
+            print("Raw eig:")
             eig, v = np.linalg.eig( result )
+            sorting_indices = np.argsort(eig)
+            eig = eig[sorting_indices]
+            v   = v[:, sorting_indices]
+            print( "List of eigenvalues: ", eig[:10])
             min_index = np.argmin(np.abs(eig))
-            max_index=np.argmax(np.abs(eig))
+            max_index = np.argmax(np.abs(eig))
             min_value = eig[ min_index ]
-            max_value=eig[max_index]
+            max_value = eig[max_index]
             min_vector = v[:, min_index]
             min_vector = min_vector/min_vector[0]
-            max_vector=v[:,max_index]
-            max_vector=max_vector/max_vector[0]
+            max_vector = v[:,max_index]
+            max_vector = max_vector/max_vector[0]
             condition_number1=max_value/min_value
              #
-            print("Min absolute eigenvalues: ", min_value)
-            print("Norm of v-1: ", np.linalg.norm(min_vector-eig_vector))
+            #print( v[:,0]*np.sqrt( self.N1 + self.N2))
+            #vector = v[:,0]
+            #test = np.dot( result, vector)
+            #print( np.linalg.norm(test) )
+            #print("Min absolute eigenvalues: ", min_value)
+            #print("Norm of v-1: ", np.linalg.norm(min_vector-eig_vector))
             print("Condtion number without stabilizer: ", condition_number1)
 
             
+            print("")
+
+            print("Regularized eig:")
             eig, v = np.linalg.eig( resultstabilized )
+            sorting_indices = np.argsort(eig)
+            eig = eig[sorting_indices]
+            v   = v[:, sorting_indices]
+            print( "List of eigenvalues: ", eig[:10])
             min_index = np.argmin(np.abs(eig))
             max_index=np.argmax(np.abs(eig))
             min_value = eig[ min_index ]
@@ -74,6 +91,8 @@ class NewtonRaphson:
             max_vector=v[:,max_index]
             max_vector=max_vector/max_vector[0]
             condition_number2=max_value/min_value
+            #print("Min absolute eigenvalues: ", min_value)
+            #print("Norm of v-1: ", np.linalg.norm(min_vector-eig_vector))
             print("Condtion number with stabilizer: ", condition_number2)
 
             print("")
