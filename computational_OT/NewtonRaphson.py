@@ -1,4 +1,3 @@
-
 from distutils import errors
 import numpy as np
 
@@ -117,8 +116,3 @@ class NewtonRaphson:
                 break
         return self.err_a,self.err_b
 
-        
-        
-
-    
-            
