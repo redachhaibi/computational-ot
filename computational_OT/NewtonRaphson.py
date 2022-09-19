@@ -53,7 +53,8 @@ class NewtonRaphson:
             sorting_indices = np.argsort(eig)
             eig = eig[sorting_indices]
             v   = v[:, sorting_indices]
-            print( "List of eigenvalues: ", eig[:10])
+            print( "List of smallest eigenvalues: ", eig[:10])
+            print( "List of largest  eigenvalues: ", eig[-10:])
             min_index = np.argmin(np.abs(eig))
             max_index = np.argmax(np.abs(eig))
             min_value = eig[ min_index ]
@@ -80,7 +81,8 @@ class NewtonRaphson:
             sorting_indices = np.argsort(eig)
             eig = eig[sorting_indices]
             v   = v[:, sorting_indices]
-            print( "List of eigenvalues: ", eig[:10])
+            print( "List of smallest eigenvalues: ", eig[:10])
+            print( "List of largest  eigenvalues: ", eig[-10:])
             min_index = np.argmin(np.abs(eig))
             max_index=np.argmax(np.abs(eig))
             min_value = eig[ min_index ]
