@@ -30,12 +30,19 @@ class _Expcuthill_mckee:
         perm_y = reverse_cuthill_mckee(P_yy_csr)
         invp_y = self._invert_permutation(perm_y)
 
-        mesh = np.meshgrid( perm_x, perm_y )
-        P_ = self.P[mesh]
-        mesh = np.meshgrid( perm_x, perm_x )
-        P_xx_ = self.P_xx[mesh]
-        mesh = np.meshgrid( perm_y, perm_y )
-        P_yy_ = self.P_yy[mesh]
+        # mesh = np.meshgrid( perm_x, perm_y )
+        # P_ = P[mesh]
+        # mesh = np.meshgrid( perm_x, perm_x )
+        # P_xx_ = P_xx[mesh]
+        # mesh = np.meshgrid( perm_y, perm_y )
+        # P_yy_ = P_yy[mesh]
+
+        mesh_x, mesh_y = np.meshgrid( perm_x, perm_y )
+        P_ = self.P[mesh_x, mesh_y]
+        mesh_x, mesh_y = np.meshgrid( perm_x, perm_x )
+        P_xx_ = self.P_xx[mesh_x, mesh_y]
+        mesh_x, mesh_y = np.meshgrid( perm_y, perm_y )
+        P_yy_ = self.P_yy[mesh_x, mesh_y]
 
     
         fig,ax=plt.subplots(figsize=(20,5),nrows=1,ncols=4)
