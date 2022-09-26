@@ -31,7 +31,6 @@ class Sinkhorn:
 
       # sinkhorn step 1
       self.u = self.a / np.dot( self.K, self.v )
-      
       # error computation 1
       r = self.v*np.dot( self.K.T, self.u)
       self.err_b.append(Lin.norm(r - self.b))
