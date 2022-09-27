@@ -45,7 +45,7 @@ class _Expcuthill_mckee:
         P_yy_ = self.P_yy[mesh_x, mesh_y]
 
     
-        fig,ax=plt.subplots(figsize=(20,5),nrows=1,ncols=4)
+        fig,ax=plt.subplots(figsize=(25,5),nrows=1,ncols=4)
         ax[0].set_title("P_xx, cutoff: "+str( cut_offx )+ " and e : "+str(epsilon)  )
         ax[0].imshow( P_xx_ );
         ax[1].set_title("P_yy , cutoff: "+str( cut_offy )+ " and e : "+str(epsilon) )
