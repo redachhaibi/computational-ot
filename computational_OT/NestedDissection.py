@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
-class NestedDisection:
+class NestedDissection:
 
     def __init__(self,P,stopdim=2):
 
@@ -27,29 +27,44 @@ class NestedDisection:
             
         if max<=self.stopdim:
 
-
             return mat[:,:]
 
         
-        elif m>=max:
+        # if m>=max:
+        if m>=max and n>=max:
 
             p=np.zeros((m,n))
             s = (m//2)
-            middle = mat[s-1,:]
+            middle1= mat[s-1,:]
         
             p[:s-1,:]=self._nd(mat[:s-1,:])
             p[s-1:m-1,:]=self._nd(mat[s:,:])
-            p[m-1,:]=middle
+            p[m-1,:]=middle1
+
+            k=(n//2)
+            middle2 = p[:,s-1]
+            p[:,:s-1]=self._nd(p[:,:s-1])
+            p[:,s-1:n-1]=self._nd(p[:,s:])
+            p[:,n-1]=middle2
    
             
-        elif n>=max:
+        else:
+            if m>=max:
+                p=np.zeros((m,n))
+                s = (m//2)
+                middle = mat[s-1,:]
+            
+                p[:s-1,:]=self._nd(mat[:s-1,:])
+                p[s-1:m-1,:]=self._nd(mat[s:,:])
+                p[m-1,:]=middle
 
-            p=np.zeros((m,n))
-            s = (n//2)
-            middle = mat[:,s-1]
-            p[:,:s-1]=self._nd(mat[:,:s-1])
-            p[:,s-1:n-1]=self._nd(mat[:,s:])
-            p[:,n-1]=middle
+            if n>=max:
+                p=np.zeros((m,n))
+                s = (n//2)
+                middle = mat[:,s-1]
+                p[:,:s-1]=self._nd(mat[:,:s-1])
+                p[:,s-1:n-1]=self._nd(mat[:,s:])
+                p[:,n-1]=middle
         
         return p
                

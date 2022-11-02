@@ -44,6 +44,7 @@ class NewtonRaphson:
         D = np.diag( r2 )
         result = np.vstack( ( np.hstack((A,B)), np.hstack((C,D)) ) )/self.epsilon
         
+        
         # Inflating the corresponding direction
         mean_eig = 0.5*np.mean( r1 ) + 0.5*np.mean( r2 )
         result_stabilized = result + mean_eig*np.dot( eig_vector, eig_vector.T)
