@@ -85,7 +85,6 @@ class LineSearchNewton:
             
             slope=np.dot(gradient.T,gradient)
             Hessian=self._getHesianQ()
-
             
 
             eig_vector = np.hstack( (np.ones(self.a.shape[0]), -np.ones(self.b.shape[0])) )/np.sqrt( self.a.shape[0] + self.b.shape[0])
