@@ -108,6 +108,7 @@ class LineSearchNewton:
 
             p_k=np.linalg.solve(Hessianstabilized,-np.vstack((grad_f,grad_g)))
 
+
             self.alpha.append(self.z)
             if i!=0:
               self.alpha[i]=self.alpha[i-1]
@@ -134,7 +135,7 @@ class LineSearchNewton:
             if i<maxiter and (self.err_a[-1]>tol or self.err_b[-1]>tol) :
                  i+=1
             else:
-                print("Terminating after teration: ",i+1)
+                print("Terminating after iteration: ",i+1)
                 break
       
         # end for    
