@@ -94,7 +94,7 @@ class LineSearchNewton:
             u = np.exp(self.f/self.epsilon)
             v = np.exp(self.g/self.epsilon)
             #
-          
+             
             r1 = np.dot((u*self.K),v)
             r2 = np.dot((v*self.K.T),u)
             P  = u*self.K*(v.T)
@@ -104,16 +104,19 @@ class LineSearchNewton:
             # Inflating the corresponding direction
             mean_eig = 0.5*np.mean( r1 ) + 0.5*np.mean( r2 )
             Hessianstabilized = Hessian + mean_eig*np.dot( eig_vector, eig_vector.T)
-           
-
             p_k=np.linalg.solve(Hessianstabilized,-np.vstack((grad_f,grad_g)))
+
+
+            # p_k=np.linalg.solve(Hessian,-np.vstack((grad_f,grad_g)))
 
 
             self.alpha.append(self.z)
             if i!=0:
-              self.alpha[i]=self.alpha[i-1]
+              self.alpha[i] = 1
+              #self.alpha[i]=self.alpha[i-1]
 
             # Wolfe Condition 1:Armijo Condition  
+            slope = np.dot( p_k.flatten(), gradient.flatten())
             self.alpha[i]=self._wolfe1(self.alpha[i],p_k,slope)
 
             #Updating f
