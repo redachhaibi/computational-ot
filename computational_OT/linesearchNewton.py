@@ -1,92 +1,83 @@
 import numpy as np
 from numpy import linalg as Lin
-
+import logging
 class LineSearchNewton:
-
-
       def __init__(self,K,a,b,f,g,epsilon,rho,rho_inc,c1,c2,z):
         self.K=K
         self.a=a
         self.b=b
         self.epsilon=epsilon
         self.x=np.hstack((f,g))
-        self.f=f
-        self.g=g
         self.rho=rho
         self.rho_inc=rho_inc
         self.c1=c1
-        self.c2=c2
         self.z=z
+        self.f=f
+        self.g=g
         self.alpha=[]
         self.err_a=[]
-        self.err_b=[]
+        self.err_b=[] 
         self.objvalues=[]
-      
+
+
       def _computegradientf(self,f):
         """Computes Gradient with respect to f"""
         return (self.a-(np.exp(f/self.epsilon)*np.dot(self.K,np.exp(self.x[:,1]/self.epsilon))).reshape(f.shape[0],-1))
 
+ 
       def _computegradientg(self,g):
         """Computes Gradient with respect to g"""
         return (self.b-(np.exp(g/self.epsilon)*np.dot(self.K.T,np.exp(self.x[:,0]/self.epsilon))).reshape(g.shape[0],-1))
 
-      def _objectivefunction(self,c):
+      def _objectivefunction(self,x):
         """Computes the value of the objective function at x"""
-        f=c[:self.a.shape[0]].reshape(self.a.shape[0],-1)
-        g=c[self.a.shape[0]:].reshape(self.b.shape[0],-1)
-
+        f=x[:,0]
+        g=x[:,1]
         return np.dot(f.T,self.a)+np.dot(g.T,self.b)-self.epsilon*np.dot(np.exp(f/self.epsilon).T,np.dot(self.K,np.exp(g/self.epsilon)))
-      
+
+
+     
+
+
       def _wolfe1(self,alpha,p,slope):#Armijo Condition
           """Backtracking""" 
           
-          X=np.hstack((self.x[:,0],self.x[:,1]))
-          X=X.reshape(X.shape[0],-1)
           reduction_count = 0
           while True:
-            condition = self._objectivefunction(X+alpha*p)<self._objectivefunction(X)+self.c1*alpha*slope
+            condition = self._objectivefunction(self.x+alpha*p)<self._objectivefunction(self.x)+self.c1*alpha*slope
             if condition:
               alpha = self.rho*alpha
               reduction_count += 1
             else:
               break
 
-          condition_inc = self._objectivefunction(X+(self.rho_inc*alpha)*p)>=self._objectivefunction(X)+self.c1*(self.rho_inc*alpha)*slope
+          condition_inc = self._objectivefunction(self.x+(self.rho_inc*alpha)*p)>=self._objectivefunction(self.x)+self.c1*(self.rho_inc*alpha)*slope
           if reduction_count==0 and condition_inc:
             alpha=self.rho_inc*alpha
+
           return alpha
+
       
-      def  _getHesianQ(self):
-        f,g=self.x[:,0],self.x[:,1]
 
-        Q11=(-1.0/self.epsilon)*np.diag(np.exp(f/self.epsilon)*np.dot(self.K,np.exp(g/self.epsilon)))
-        Q12=(-1.0/self.epsilon)*(np.exp(f/self.epsilon)*self.K*(np.exp(g/self.epsilon).T))
-        Q21=Q12.T
-        Q22=(-1.0/self.epsilon)*np.diag(np.exp(g/self.epsilon)*np.dot(self.K.T,np.exp(f/self.epsilon)))
-        
-        HessianQ=np.zeros((Q11.shape[0]+Q21.shape[0],Q11.shape[1]+Q12.shape[1]))
-    
-        HessianQ[:Q11.shape[0],:Q11.shape[1]]=Q11
-        HessianQ[Q11.shape[0]:,:Q11.shape[1]]=Q12
-        HessianQ[:Q11.shape[0],Q11.shape[1]:]=Q21
-        HessianQ[Q11.shape[0]:,Q11.shape[1]:]=Q22
-        
-        return HessianQ 
-                 
-
+      # def _isnegdefinite(self,Hessian):
+      #   return np.all(np.linalg.eigvals(Hessian)<0)
+      
       def _update(self, tol=1e-12, maxiter=1000):
         
         i=0
         while True :
+            self.alpha.append(self.z)
             grad_f=self._computegradientf(self.x[:,0])
             grad_g=self._computegradientg(self.x[:,1])
         
             gradient=np.vstack((grad_f,grad_g))
             
             slope=np.dot(gradient.T,gradient)
-            Hessian=self._getHesianQ()
+
             
 
+          
+            # Regularize
             eig_vector = np.hstack( (np.ones(self.a.shape[0]), -np.ones(self.b.shape[0])) )/np.sqrt( self.a.shape[0] + self.b.shape[0])
             eig_vector = np.reshape( eig_vector, (self.a.shape[0] + self.b.shape[0], 1) )
 
@@ -94,32 +85,34 @@ class LineSearchNewton:
             u = np.exp(self.f/self.epsilon)
             v = np.exp(self.g/self.epsilon)
             #
-             
+            
             r1 = np.dot((u*self.K),v)
             r2 = np.dot((v*self.K.T),u)
             P  = u*self.K*(v.T)
-             
             
             
+            A = np.diag( np.array(r1.reshape(r1.shape[0],)) )
+            B = P
+            C = P.T
+            D = np.diag( np.array(r2.reshape(r2.shape[0],)) )
+            result = np.vstack( ( np.hstack((A,B)), np.hstack((C,D)) ) )/self.epsilon
+
             # Inflating the corresponding direction
             mean_eig = 0.5*np.mean( r1 ) + 0.5*np.mean( r2 )
-            Hessianstabilized = Hessian + mean_eig*np.dot( eig_vector, eig_vector.T)
-            p_k=np.linalg.solve(Hessianstabilized,-np.vstack((grad_f,grad_g)))
+            Hessianstabilized = result + mean_eig*np.dot( eig_vector, eig_vector.T)
 
+            try:
+              p_k=np.linalg.solve(Hessianstabilized,gradient)
 
-            # p_k=np.linalg.solve(Hessian,-np.vstack((grad_f,grad_g)))
-
-
-            self.alpha.append(self.z)
-            if i!=0:
-              self.alpha[i] = 1
-              #self.alpha[i]=self.alpha[i-1]
+            except:
+              print("Inverse does not exist at epsilon:",self.epsilon)
+              return np.zeros(6)
 
             # Wolfe Condition 1:Armijo Condition  
-            slope = np.dot( p_k.flatten(), gradient.flatten())
-            self.alpha[i]=self._wolfe1(self.alpha[i],p_k,slope)
+            slope = np.dot( p_k.T, gradient)
+            self.alpha[i]=self._wolfe1(self.alpha[i],np.hstack((p_k[:self.a.shape[0]],p_k[self.a.shape[0]:])),slope)
 
-            #Updating f
+            #updating f
             self.x[:,0]=self.x[:,0]+self.alpha[i]*p_k[:self.a.shape[0]].reshape(self.a.shape[0],)
            
             # error computation 1
@@ -132,8 +125,9 @@ class LineSearchNewton:
             # error computation 2
             r = np.exp(self.x[:,1]/self.epsilon)*np.dot(self.K .T, np.exp(self.x[:,0]/self.epsilon))
             self.err_b.append(Lin.norm(r - self.b))
+
             #Calculating Objective values
-            self.objvalues.append(self._objectivefunction(np.hstack((self.x[:,0],self.x[:,1]))))
+            self.objvalues.append(self._objectivefunction(self.x))
             
             if i<maxiter and (self.err_a[-1]>tol or self.err_b[-1]>tol) :
                  i+=1

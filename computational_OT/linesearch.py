@@ -54,9 +54,8 @@ class LineSearch:
           return alpha
 
         
-
       
-
+    
             
 
       def _update(self, tol=1e-12, maxiter=1000):
