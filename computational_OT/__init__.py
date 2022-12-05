@@ -7,5 +7,5 @@ from .NewtonRaphson import *
 from .Newtonbasincheck import *
 from ._Cuthill_Mckee import _Expcuthill_mckee
 from .NestedDissection import *
-from .linesearchNewton import *
+from  .Damped_Newton import *
 

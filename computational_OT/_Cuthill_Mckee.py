@@ -19,7 +19,7 @@ class _Expcuthill_mckee:
         s[p] = np.arange(p.size)
         return s
 
-    def _evaluate(self,cut_offx=0,cut_offy=0,epsilon=0):
+    def _evaluate(self,cut_offx=0,cut_offy=0,epsilon=0,index=0):
         P_xx_   = self.P_xx*( self.P_xx > cut_offx)
         P_xx_csr = csr_matrix(P_xx_)
         perm_x = reverse_cuthill_mckee(P_xx_csr)
@@ -45,13 +45,14 @@ class _Expcuthill_mckee:
         P_yy_ = self.P_yy[mesh_x, mesh_y]
 
     
-        fig,ax=plt.subplots(figsize=(25,5),nrows=1,ncols=4)
-        ax[0].set_title("P_xx, cutoff: "+str( cut_offx )+ " and e : "+str(epsilon)  )
+        fig,ax=plt.subplots(figsize=(25,5),nrows=1,ncols=3)
+        ax[0].set_title("P$_{\epsilon}$P$^{T}_{\epsilon}$ , cutoff: "+str( cut_offx )+ " and $\epsilon$ : "+str(epsilon)  )
         ax[0].imshow( P_xx_ );
-        ax[1].set_title("P_yy , cutoff: "+str( cut_offy )+ " and e : "+str(epsilon) )
+        ax[1].set_title("P$^{T}_{\epsilon}$P$_{\epsilon}$ , cutoff: "+str( cut_offy )+ " and $\epsilon$ : "+str(epsilon) )
         ax[1].imshow( P_yy_ );
-        ax[2].set_title("P_  and e : "+str(epsilon) )
+        ax[2].set_title("P$_{\epsilon}$  and $\epsilon$ : "+str(epsilon) )
         ax[2].imshow( P_ );
-        ax[3].set_title("P_xx  and e : "+str(epsilon)  )
-        ax[3].imshow( self.P_xx );
+        # ax[3].set_title("P_xx  and e : "+str(epsilon)  )
+        # ax[3].imshow( self.P_xx );
+        plt.savefig("Plot"+str(index)+".png")
         plt.show()

@@ -47,6 +47,7 @@ class Sinkhorn:
           i+=1
       else:
         break   
+
     # end for
     return self.u,self.v,self.err_a,self.err_b,self.obj
     

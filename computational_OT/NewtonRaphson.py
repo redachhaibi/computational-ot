@@ -42,7 +42,7 @@ class NewtonRaphson:
         B = P
         C = P.T
         D = np.diag( r2 )
-        result = np.vstack( ( np.hstack((A,B)), np.hstack((C,D)) ) )/self.epsilon
+        result = -np.vstack( ( np.hstack((A,B)), np.hstack((C,D)) ) )/self.epsilon
         
         
         # Inflating the corresponding direction
@@ -93,7 +93,7 @@ class NewtonRaphson:
             target   = self._func_phi()
             jacobian = self._func_jacobian(debug)
             e = [np.linalg.norm( target[:self.N1]),np.linalg.norm( target[self.N1:])]
-            self.x   = self.x - np.linalg.solve( jacobian, target )
+            self.x   = self.x + np.linalg.solve( jacobian, target )
             # Matrix inversion
             # inv_jac  = np.linalg.inv( jacobian)
             # x = x - np.dot( inv_jac, target )
