@@ -11,6 +11,10 @@ class DampedNewton:
         self.rho=rho
         #self.rho_inc=rho_inc
         self.c1=c1
+<<<<<<< HEAD:computational_OT/Damped_Newton.py
+=======
+        #self.z=z
+>>>>>>> 41d2897c8cc36f9486e506dc6b3f04f81a7a83eb:computational_OT/linesearchNewton.py
         # DANGEROUS: Duplication of data
         #self.f=f
         #self.g=g
@@ -48,6 +52,15 @@ class DampedNewton:
               reduction_count += 1
             else:
               break
+<<<<<<< HEAD:computational_OT/Damped_Newton.py
+=======
+          
+          # ERROR: No incrementing for Damped Newton
+          # condition_inc = self._objectivefunction(self.x+(self.rho_inc*alpha)*p)>=self._objectivefunction(self.x)+self.c1*(self.rho_inc*alpha)*slope
+          # if reduction_count==0 and condition_inc:
+          #   alpha=self.rho_inc*alpha
+
+>>>>>>> 41d2897c8cc36f9486e506dc6b3f04f81a7a83eb:computational_OT/linesearchNewton.py
           return alpha
 
       
