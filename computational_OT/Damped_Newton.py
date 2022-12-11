@@ -65,7 +65,7 @@ class DampedNewton:
             v = np.exp(self.x[:,1]/self.epsilon)
             #
             
-            r1 = u*np.dot(  self.K,v)
+            r1 = u*np.dot(self.K,v)
             r2 = v*np.dot(self.K.T,u)
             P  = u*self.K*(v.T)
 
