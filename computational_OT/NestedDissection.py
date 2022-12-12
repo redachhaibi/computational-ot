@@ -88,7 +88,7 @@ class NestedDissection:
         ax[1].imshow( Pyy );
         ax[2].set_title("P$_{\epsilon}$, $\epsilon$: "+str(epsilon) )
         ax[2].imshow( P_nd );
-        plt.savefig("nnd"+str(index)+".png")
+        plt.savefig("./NewtonSparsity_images/nnd"+str(index)+".png")
         plt.show()
 
 

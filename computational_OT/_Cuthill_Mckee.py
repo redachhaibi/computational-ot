@@ -54,5 +54,5 @@ class _Expcuthill_mckee:
         ax[2].imshow( P_ );
         # ax[3].set_title("P_xx  and e : "+str(epsilon)  )
         # ax[3].imshow( self.P_xx );
-        plt.savefig("Plot"+str(index)+".png")
+        plt.savefig("./NewtonSparsity_images/RCM"+str(index)+".png")
         plt.show()
