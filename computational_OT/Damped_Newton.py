@@ -2,15 +2,15 @@ import numpy as np
 from numpy import linalg as Lin
 import logging
 class DampedNewton:
-      def __init__(self,K,a,b,f,g,epsilon,rho,c1,reg_matrix):
+      def __init__(self,K,a,b,f,g,epsilon,rho,c,reg_matrices):
         self.K=K
         self.a=a
         self.b=b
         self.epsilon=epsilon
         self.x=np.hstack((f,g))
         self.rho=rho
-        self.c1=c1
-        self._reg_matrix=reg_matrix
+        self.c=c
+        self._reg_matrices=reg_matrices
         self.alpha=[]
         self.err_a=[]
         self.err_b=[] 
@@ -39,7 +39,7 @@ class DampedNewton:
           
           reduction_count = 0
           while True:
-            condition = self._objectivefunction(self.x+alpha*p)<self._objectivefunction(self.x)+self.c1*alpha*slope
+            condition = self._objectivefunction(self.x+alpha*p)<self._objectivefunction(self.x)+self.c*alpha*slope
             if condition:
               alpha = self.rho*alpha
               reduction_count += 1
@@ -49,7 +49,7 @@ class DampedNewton:
 
       
 
-      def _update(self, tol=1e-12, maxiter=100):
+      def _update(self,tol=1e-12, maxiter=100):
         
         i=0
         while True :
@@ -76,16 +76,19 @@ class DampedNewton:
             result = np.vstack( ( np.hstack((A,B)), np.hstack((C,D)) ) )
 
             self.Hessian = -result/self.epsilon
-          
-            
-          
             # Inflating the corresponding direction
             mean_eig = -(0.5*np.mean( r1 ) + 0.5*np.mean( r2 ))/self.epsilon
-            self.Hessian_stabilized = self.Hessian + mean_eig*self._reg_matrix
+            self.Hessian_stabilized = self.Hessian + mean_eig*self._reg_matrices[0]
 
-
+            
+          
+            
+            # Preconditioning step
+            self.Hessian_stabilized=np.dot(np.dot( self._reg_matrices[1],self.Hessian_stabilized), self._reg_matrices[1])
+            gradient=np.dot( self._reg_matrices[1],gradient)
+              
             try:
-              p_k=-np.linalg.solve( self.Hessian_stabilized, gradient)
+              p_k=-np.linalg.solve( self.Hessian_stabilized,gradient)
               #p_k=gradient/self.epsilon
 
             except:
