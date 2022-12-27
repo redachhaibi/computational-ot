@@ -1,8 +1,9 @@
 import numpy as np
 from numpy import linalg as Lin
 import logging
-class DampedNewton:
-      def __init__(self,K,a,b,f,g,epsilon,rho,c,reg_matrices):
+
+class DampedNewton_With_Preconditioner:
+      def __init__(self,K,a,b,f,g,epsilon,rho,c,null_vector,precond_vectors):
         self.K=K
         self.a=a
         self.b=b
@@ -10,7 +11,8 @@ class DampedNewton:
         self.x=np.hstack((f,g))
         self.rho=rho
         self.c=c
-        self._reg_matrices=reg_matrices
+        self.null_vector    =null_vector
+        self.precond_vectors=precond_vectors
         self.alpha=[]
         self.err_a=[]
         self.err_b=[] 
@@ -46,10 +48,76 @@ class DampedNewton:
             else:
               break
           return alpha
+        
+      def _precond_inversion( self, unnormalized_Hessian, gradient, iterative=False, maxiter=20, debug=False ):
 
-      
+        # Record list of unwinding transformations on final result
+        unwinding_transformations = []
 
-      def _update(self,tol=1e-12, maxiter=100):
+        # Construct modified Hessian
+        diag = 1/np.sqrt( np.diag(unnormalized_Hessian).flatten() )
+        self.modified_Hessian = diag[:,None]*unnormalized_Hessian*diag[None,:]
+        
+        # Dummy variable to work on
+        matrix = self.modified_Hessian
+
+        # Preconditioning along null vector
+        vector = self.null_vector
+        vector = vector/diag
+        vector = vector/np.linalg.norm(vector)
+        vector = vector.reshape( (len(vector), 1) )
+        matrix = matrix + np.dot( vector, vector.T)
+        # Transformations
+        gradient = diag[:,None]*gradient
+        unwinding_transformations.append( [diag, lambda d,x : d[:,None]*x])
+
+        # Conditioning with other vectors
+        k = len( self.precond_vectors )
+        n = self.null_vector.shape[0]
+        for i in range(k):
+            vector = self.precond_vectors[i]
+            value  = np.dot( np.dot( matrix, vector ), vector)
+            vector = vector.reshape( (vector.shape[0], 1) )
+            P_matrix = np.identity(n) + (1/np.sqrt(value)-1)*np.dot( vector, vector.T)
+            # Transforms
+            matrix = np.dot( P_matrix, np.dot(matrix, P_matrix) )
+            gradient = np.dot( P_matrix, gradient)
+            unwinding_transformations.append( [P_matrix, lambda P,x : np.dot(P, x)] )
+        # end for
+
+        # Debug
+        if debug:
+          eig, v = np.linalg.eigh( matrix )
+          sorting_indices = np.argsort(eig)
+          eig = eig[sorting_indices]
+          v   = v[:, sorting_indices]
+          #
+          print( "List of smallest eigenvalues: ", eig[:5])
+          print( "List of largest  eigenvalues: ", eig[-5:])
+        
+        # Solve
+        self.Hessian_stabilized = -matrix/self.epsilon
+        if iterative:
+          accumulator = gradient
+          inverse = gradient
+          delta   = -(matrix-np.identity(n)) # Unipotent part
+          for i in range(maxiter):
+            accumulator = np.dot(delta, accumulator)
+            inverse = inverse + accumulator
+          p_k = self.epsilon*inverse
+        else:
+          p_k=-np.linalg.solve( self.Hessian_stabilized, gradient)
+        
+
+        # Unwind
+        for transform in unwinding_transformations:
+          P,f = transform
+          p_k = f(P,p_k)
+
+        return p_k
+
+
+      def _update(self,tol=1e-11, maxiter=100, iterative_inversion=True, debug=False):
         
         i=0
         while True :
@@ -57,8 +125,7 @@ class DampedNewton:
             grad_g=self._computegradientg(self.x[:,1])
         
             gradient=np.vstack((grad_f,grad_g))
-            
-            
+                        
             # Regularize
             u = np.exp(self.x[:,0]/self.epsilon)
             v = np.exp(self.x[:,1]/self.epsilon)
@@ -74,20 +141,23 @@ class DampedNewton:
             result = np.vstack( ( np.hstack((A,B)), np.hstack((C,D)) ) )
 
             self.Hessian = -result/self.epsilon
-            # Inflating the corresponding direction
-            mean_eig = -(0.5*np.mean( r1 ) + 0.5*np.mean( r2 ))/self.epsilon
-            self.Hessian_stabilized = self.Hessian + mean_eig*self._reg_matrices[0]
-            
-            # Preconditioning step
-            self.Hessian_stabilized=np.dot(np.dot( self._reg_matrices[1],self.Hessian_stabilized), self._reg_matrices[1])
-            gradient=np.dot( self._reg_matrices[1],gradient)
-              
-            try:
-              p_k=-np.linalg.solve( self.Hessian_stabilized,gradient)
 
-            except:
-              print("Inverse does not exist at epsilon:",self.epsilon)
-              return np.zeros(6)
+            # Inverting Hessian against gradient with preconditioning
+            p_k  = self._precond_inversion( result, gradient, iterative=iterative_inversion, debug=debug )
+
+            # print("Outputs")
+            # print( np.linalg.norm(p_k-p_k2))
+            # print( np.linalg.norm(p_k))
+            # print( np.linalg.norm(p_k2))
+
+            #p_k = p_k2
+            
+            # try:
+            #   p_k = self._precond_inversion( result, gradient )
+
+            # except:
+            #   print("Inverse does not exist at epsilon:",self.epsilon)
+            #   return np.zeros(6)
 
             # Stacked
             p_k_stacked = np.hstack((p_k[:self.a.shape[0]],p_k[self.a.shape[0]:]))
