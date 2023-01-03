@@ -48,8 +48,16 @@ class DampedNewton_With_Preconditioner:
             else:
               break
           return alpha
-        
-      def _precond_inversion( self, unnormalized_Hessian, gradient, iterative=False, maxiter=20, debug=False ):
+      
+      # First implementation
+      # To be made faster using
+      # - vector operations only
+      # - C code following 
+      #   |- https://medium.com/spikelab/calling-c-functions-from-python-104e609f2804
+      #   |- https://scipy-lectures.org/advanced/interfacing_with_c/interfacing_with_c.html
+      #
+      # TODO: Complete refactor.
+      def _precond_inversion( self, unnormalized_Hessian, gradient, iterative_inversion=-1, debug=False ):
 
         # Record list of unwinding transformations on final result
         unwinding_transformations = []
@@ -97,11 +105,11 @@ class DampedNewton_With_Preconditioner:
         
         # Solve
         self.Hessian_stabilized = -matrix/self.epsilon
-        if iterative:
+        if iterative_inversion >= 0:
           accumulator = gradient
           inverse = gradient
           delta   = -(matrix-np.identity(n)) # Unipotent part
-          for i in range(maxiter):
+          for i in range(iterative_inversion):
             accumulator = np.dot(delta, accumulator)
             inverse = inverse + accumulator
           p_k = self.epsilon*inverse
@@ -117,7 +125,7 @@ class DampedNewton_With_Preconditioner:
         return p_k
 
 
-      def _update(self,tol=1e-11, maxiter=100, iterative_inversion=True, debug=False):
+      def _update(self,tol=1e-11, maxiter=100, iterative_inversion=-1, debug=False):
         
         i=0
         while True :
@@ -132,7 +140,8 @@ class DampedNewton_With_Preconditioner:
             
             r1 = u*np.dot(self.K,v)
             r2 = v*np.dot(self.K.T,u)
-            P  = u*self.K*(v.T)
+            # P  = u*self.K*(v.T) # WRONG AGAIN: DANGEROUS CODE!!
+            P = u[:,None]*self.K*v[None,:]
 
             A = np.diag( np.array(r1.reshape(r1.shape[0],)) )
             B = P
@@ -143,7 +152,7 @@ class DampedNewton_With_Preconditioner:
             self.Hessian = -result/self.epsilon
 
             # Inverting Hessian against gradient with preconditioning
-            p_k  = self._precond_inversion( result, gradient, iterative=iterative_inversion, debug=debug )
+            p_k  = self._precond_inversion( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
 
             # print("Outputs")
             # print( np.linalg.norm(p_k-p_k2))

@@ -2,7 +2,7 @@ import numpy as np
 from numpy import linalg as Lin
 import logging
 class DampedNewton:
-      def __init__(self,K,a,b,f,g,epsilon,rho,c,reg_matrices):
+      def __init__(self,K,a,b,f,g,epsilon,rho,c):
         self.K=K
         self.a=a
         self.b=b
@@ -10,7 +10,12 @@ class DampedNewton:
         self.x=np.hstack((f,g))
         self.rho=rho
         self.c=c
-        self._reg_matrices=reg_matrices
+        # null vector
+        null_vector = np.hstack( (np.ones(a.shape[0]), -np.ones(b.shape[0])) )/np.sqrt( a.shape[0] + b.shape[0])
+        null_vector = np.reshape( null_vector, (a.shape[0] + b.shape[0], 1) )
+        self.null_vector = null_vector
+        self.reg_matrix = np.dot( null_vector, null_vector.T)
+        #
         self.alpha=[]
         self.err_a=[]
         self.err_b=[] 
@@ -49,7 +54,7 @@ class DampedNewton:
 
       
 
-      def _update(self,tol=1e-12, maxiter=100):
+      def _update(self,tol=1e-12, maxiter=100, debug=False):
         
         i=0
         while True :
@@ -59,13 +64,14 @@ class DampedNewton:
             gradient=np.vstack((grad_f,grad_g))
             
             
-            # Regularize
+            # Compute Hessian
             u = np.exp(self.x[:,0]/self.epsilon)
             v = np.exp(self.x[:,1]/self.epsilon)
-            
+
             r1 = u*np.dot(self.K,v)
             r2 = v*np.dot(self.K.T,u)
-            P  = u*self.K*(v.T)
+            # P  = u*self.K*(v.T) # WRONG AGAIN: DANGEROUS CODE!!
+            P = u[:,None]*self.K*v[None,:]
 
             A = np.diag( np.array(r1.reshape(r1.shape[0],)) )
             B = P
@@ -74,20 +80,70 @@ class DampedNewton:
             result = np.vstack( ( np.hstack((A,B)), np.hstack((C,D)) ) )
 
             self.Hessian = -result/self.epsilon
+
+            # Debug
+            # if debug:
+            #   scaling = 1.0/np.mean( np.diag(self.Hessian) )
+            #   eig, v = np.linalg.eigh( self.Hessian * scaling )
+            #   sorting_indices = np.argsort(eig)
+            #   eig = eig[sorting_indices]
+            #   v   = v[:, sorting_indices]
+            #   #
+            #   empirical_null_vector = v[:,0]
+            #   empirical_null_vector = np.reshape( empirical_null_vector, (len(empirical_null_vector),1) )
+            #   self.reg_matrix = np.dot( empirical_null_vector, empirical_null_vector.T)
+            #   #
+            #   print( "--- Unstabilized")
+            #   print( "List of --smallest eigenvalues: ", eig[:3])
+            #   print( "        |-largest  eigenvalues: ", eig[-3:])
+            #   print( "        |- sum of  eigenvalues: ", eig[:3]+np.flip(eig[-3:]) )
+              # print( "Null vector vs empirical:", np.dot(self.null_vector.flatten(), empirical_null_vector.flatten()) )
+              # print( "Gradient along -- 0  :", np.dot(gradient.flatten(), v[:,0])/np.linalg.norm(gradient) )
+              # print( "               |- 1  :", np.dot(gradient.flatten(), v[:,1])/np.linalg.norm(gradient) )
+              # print( "               |- 2  :", np.dot(gradient.flatten(), v[:,2])/np.linalg.norm(gradient) )
+              # print( "               |- m-1:", np.dot(gradient.flatten(), v[:,-2])/np.linalg.norm(gradient) )
+              # print( "               |- m  :", np.dot(gradient.flatten(), v[:,-1])/np.linalg.norm(gradient) )
+              #print( "Null vector vs gradient :", np.dot(self.null_vector.flatten(), gradient.flatten()) )
+              #print( "Null vector vs p_k      :", np.dot(self.null_vector.flatten(), p_k.flatten()) )
+
             # Inflating the corresponding direction
             mean_eig = -(0.5*np.mean( r1 ) + 0.5*np.mean( r2 ))/self.epsilon
-            self.Hessian_stabilized = self.Hessian + mean_eig*self._reg_matrices[0]
+            self.Hessian_stabilized = self.Hessian + mean_eig*self.reg_matrix
             
-            # Preconditioning step
-            self.Hessian_stabilized=np.dot(np.dot( self._reg_matrices[1],self.Hessian_stabilized), self._reg_matrices[1])
-            gradient=np.dot( self._reg_matrices[1],gradient)
-              
+            # Debug
+            # if debug:
+            #   scaling = 1.0/np.mean( np.diag(self.Hessian_stabilized) )
+            #   eig, v = np.linalg.eigh( self.Hessian_stabilized * scaling )
+            #   sorting_indices = np.argsort(eig)
+            #   eig = eig[sorting_indices]
+            #   v   = v[:, sorting_indices]
+            #   #
+            #   empirical_null_vector = v[:,0]
+            #   empirical_null_vector = np.reshape( empirical_null_vector, (len(empirical_null_vector),1) )
+            #   self.reg_matrix = np.dot( empirical_null_vector, empirical_null_vector.T)
+            #   #
+            #   print( "--- Stabilized")
+            #   print( "List of --smallest eigenvalues: ", eig[:3])
+            #   print( "Null vector vs empirical:", np.dot(self.null_vector.flatten(), empirical_null_vector.flatten()) )
+            #   print( "")
+              #print( "Null vector vs gradient :", np.dot(self.null_vector.flatten(), gradient.flatten()) )
+              #print( "Null vector vs p_k      :", np.dot(self.null_vector.flatten(), p_k.flatten()) )
+
             try:
               p_k=-np.linalg.solve( self.Hessian_stabilized,gradient)
 
             except:
               print("Inverse does not exist at epsilon:",self.epsilon)
               return np.zeros(6)
+
+            p_k = p_k - self.null_vector*np.dot(self.null_vector.flatten(), p_k.flatten())
+
+            # 
+            # if debug:
+            #   cos_metric = np.dot( p_k.flatten(), gradient.flatten())/( np.linalg.norm(p_k)*np.linalg.norm(gradient) )
+            #   print( "Cos metric: ", cos_metric)
+            #   if cos_metric<0:
+            #     p_k = -p_k
 
             # Stacked
             p_k_stacked = np.hstack((p_k[:self.a.shape[0]],p_k[self.a.shape[0]:]))
