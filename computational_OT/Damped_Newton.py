@@ -7,7 +7,7 @@ class DampedNewton:
         self.a=a
         self.b=b
         self.epsilon=epsilon
-        self.x=np.hstack((f,g))
+        self.x=np.vstack((f,g))
         self.rho=rho
         self.c=c
         # null vector
@@ -25,19 +25,21 @@ class DampedNewton:
       def _computegradientf(self,f):
         """Computes Gradient with respect to f"""
         u = np.exp(f/self.epsilon)
-        v = np.exp(self.x[:,1]/self.epsilon)
+        v = np.exp(self.x[self.a.shape[0]:]/self.epsilon)
         return self.a-(u*np.dot(self.K,v)).reshape(f.shape[0],-1)
 
  
       def _computegradientg(self,g):
-        """Computes Gradient with respect to g"""
-        return (self.b-(np.exp(g/self.epsilon)*np.dot(self.K.T,np.exp(self.x[:,0]/self.epsilon))).reshape(g.shape[0],-1))
+        u = np.exp(self.x[:self.a.shape[0]]/self.epsilon)
+        v = np.exp(g/self.epsilon)
+        return self.b-(v*np.dot(self.K.T,u)).reshape(g.shape[0],-1)
 
       def _objectivefunction(self,x):
         """Computes the value of the objective function at x"""
-        f=x[:,0]
-        g=x[:,1]
-        return np.dot(f.T,self.a)+np.dot(g.T,self.b)-self.epsilon*np.dot(np.exp(f/self.epsilon).T,np.dot(self.K,np.exp(g/self.epsilon)))
+        f=x[:self.a.shape[0]]
+        g=x[self.a.shape[0]:]
+        regularizer=-self.epsilon*np.dot(np.exp(f/self.epsilon).T,np.dot(self.K,np.exp(g/self.epsilon)))
+        return np.dot(f.T,self.a)+np.dot(g.T,self.b)+regularizer
 
       def _wolfe1(self,alpha,p,slope):#Armijo Condition
           """Backtracking""" 
@@ -58,20 +60,20 @@ class DampedNewton:
         
         i=0
         while True :
-            grad_f=self._computegradientf(self.x[:,0])
-            grad_g=self._computegradientg(self.x[:,1])
+            grad_f=self._computegradientf(self.x[:self.a.shape[0]])
+            grad_g=self._computegradientg(self.x[self.a.shape[0]:])
         
             gradient=np.vstack((grad_f,grad_g))
             
             
             # Compute Hessian
-            u = np.exp(self.x[:,0]/self.epsilon)
-            v = np.exp(self.x[:,1]/self.epsilon)
-
+            u = np.exp(self.x[:self.a.shape[0]]/self.epsilon)
+            v = np.exp(self.x[self.a.shape[0]:]/self.epsilon)
             r1 = u*np.dot(self.K,v)
             r2 = v*np.dot(self.K.T,u)
             # P  = u*self.K*(v.T) # WRONG AGAIN: DANGEROUS CODE!!
-            P = u[:,None]*self.K*v[None,:]
+            # P = u[:,None]*self.K*v[None,:]
+            P  = u*self.K*(v.T)
 
             A = np.diag( np.array(r1.reshape(r1.shape[0],)) )
             B = P
@@ -146,7 +148,7 @@ class DampedNewton:
             #     p_k = -p_k
 
             # Stacked
-            p_k_stacked = np.hstack((p_k[:self.a.shape[0]],p_k[self.a.shape[0]:]))
+            p_k_stacked = np.vstack((p_k[:self.a.shape[0]],p_k[self.a.shape[0]:]))
 
             # Wolfe Condition 1: Armijo Condition  
             slope = np.dot( p_k.T, gradient)[0][0]
@@ -158,16 +160,16 @@ class DampedNewton:
             self.x = self.x + alpha*p_k_stacked
           
             # error computation 1
-            s = np.exp(self.x[:,0]/self.epsilon)*np.dot(self.K,np.exp(self.x[:,1]/self.epsilon))
+            s = np.exp(self.x[:self.a.shape[0]]/self.epsilon)*np.dot(self.K,np.exp(self.x[self.a.shape[0]:]/self.epsilon))
             self.err_a.append(Lin.norm(s - self.a))
 
             # error computation 2
-            r = np.exp(self.x[:,1]/self.epsilon)*np.dot(self.K .T, np.exp(self.x[:,0]/self.epsilon))
+            r = np.exp(self.x[self.a.shape[0]:]/self.epsilon)*np.dot(self.K .T, np.exp(self.x[:self.a.shape[0]]/self.epsilon))
             self.err_b.append(Lin.norm(r - self.b))
 
             # Calculating Objective values
             value = self._objectivefunction(self.x)
-            self.objvalues.append(value)
+            self.objvalues.append(value[0])
             
             if i<maxiter and (self.err_a[-1]>tol or self.err_b[-1]>tol) :
                  i+=1
@@ -176,6 +178,6 @@ class DampedNewton:
                 break
       
         # end for    
-        return self.x[:,0],self.x[:,1],self.err_a,self.err_b ,self.objvalues,self.alpha
+        return self.x[:self.a.shape[0]],self.x[self.a.shape[0]:],self.err_a,self.err_b ,self.objvalues,self.alpha
         
 #Footer
