@@ -128,7 +128,7 @@ class DampedNewton_With_Preconditioner:
 
         return p_k
 
-
+      ## Records time
       def _precond_inversion_debug( self, unnormalized_Hessian, gradient, iterative_inversion=-1, debug=False ):
 
         # Record list of unwinding transformations on final result
@@ -165,7 +165,7 @@ class DampedNewton_With_Preconditioner:
             gradient = np.dot( P_matrix, gradient)
             unwinding_transformations.append( [P_matrix, lambda P,x : np.dot(P, x)] )
         end1=time.time()
-        print("\n Time required for preconditioning matrix formation: ", np.round(end1-start,5) ,"s.")
+        print("\n|--- Time required for preconditioning matrix formation: ", np.round(end1-start,5) ,"s---|")
         # end for
 
         start2=time.time()
@@ -180,7 +180,7 @@ class DampedNewton_With_Preconditioner:
           print( "List of largest  eigenvalues: ", eig[-5:])
         end2=time.time()
 
-        print("\n Time taken to debug: ", np.round(end2-start2,5),"s.")
+        print("\n|--- Time taken for the debug step: ", np.round(end2-start2,5),"s---|")
 
         start3=time.time()
         # Solve
@@ -196,7 +196,7 @@ class DampedNewton_With_Preconditioner:
         else:
           p_k=-np.linalg.solve( self.Hessian_stabilized, gradient)
         end3=time.time()
-        print("\n Time taken to evaluate p_k: ",np.round(end3-start3,5),"s.")
+        print("\n|--- Time taken to evaluate p_k: ",np.round(end3-start3,5),"s---|")
 
         start4=time.time()
         # Unwind
@@ -204,9 +204,9 @@ class DampedNewton_With_Preconditioner:
           P,f = transform
           p_k = f(P,p_k)
         end=time.time()
-        print("\n Time taken for unwinding: ",np.round(end-start4,5),"s.")
+        print("\n|--- Time taken for unwinding: ",np.round(end-start4,5),"s---|")
 
-        print("\n Time taken for the complete code block: ",np.round(end-start,2),"s.")
+        print("\n|--- Time taken for the complete code block: ",np.round(end-start,2),"s---|")
         return p_k
 
 
