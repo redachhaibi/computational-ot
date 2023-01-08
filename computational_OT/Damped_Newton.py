@@ -72,8 +72,8 @@ class DampedNewton:
             r1 = u*np.dot(self.K,v)
             r2 = v*np.dot(self.K.T,u)
             # P  = u*self.K*(v.T) # WRONG AGAIN: DANGEROUS CODE!!
+            P=u*self.K*(v.T)
             # P = u[:,None]*self.K*v[None,:]
-            P  = u*self.K*(v.T)
 
             A = np.diag( np.array(r1.reshape(r1.shape[0],)) )
             B = P
