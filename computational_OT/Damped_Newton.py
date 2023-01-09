@@ -60,6 +60,7 @@ class DampedNewton:
         
         i=0
         while True :
+            
             grad_f=self._computegradientf(self.x[:self.a.shape[0]])
             grad_g=self._computegradientg(self.x[self.a.shape[0]:])
         
@@ -72,8 +73,9 @@ class DampedNewton:
             r1 = u*np.dot(self.K,v)
             r2 = v*np.dot(self.K.T,u)
             # P  = u*self.K*(v.T) # WRONG AGAIN: DANGEROUS CODE!!
-            P=u*self.K*(v.T)
-            # P = u[:,None]*self.K*v[None,:]
+            u=u.reshape(u.shape[0],)
+            v=v.reshape(v.shape[0],)
+            P = u[:,None]*self.K*v[None,:]
 
             A = np.diag( np.array(r1.reshape(r1.shape[0],)) )
             B = P

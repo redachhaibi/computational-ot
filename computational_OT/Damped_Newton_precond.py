@@ -10,7 +10,7 @@ class DampedNewton_With_Preconditioner:
         self.b=b
         self.epsilon=epsilon
         self.x=np.vstack((f,g))
-        self.rho=rho
+        self.rho=rho           
         self.c=c
         self.null_vector =null_vector
         self.precond_vectors=precond_vectors
@@ -228,8 +228,9 @@ class DampedNewton_With_Preconditioner:
             r1 = u*np.dot(self.K,v)
             r2 = v*np.dot(self.K.T,u)
             # P  = u*self.K*(v.T) # WRONG AGAIN: DANGEROUS CODE!!
-            # P = u[:,None]*self.K*v[None,:]
-            P  = u*self.K*(v.T)
+            u=u.reshape(u.shape[0],)
+            v=v.reshape(v.shape[0],)
+            P = u[:,None]*self.K*v[None,:]
 
             A = np.diag( np.array(r1.reshape(r1.shape[0],)) )
             B = P
