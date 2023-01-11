@@ -82,19 +82,20 @@ class DampedNewton_With_Preconditioner:
         # Transformations
         gradient = diag[:,None]*gradient
         unwinding_transformations.append( [diag, lambda d,x : d[:,None]*x])
-
+        
         # Conditioning with other vectors
         k = len( self.precond_vectors )
         n = self.null_vector.shape[0]
+        P_matrix=np.identity(n)
         for i in range(k):
-            vector = self.precond_vectors[i]
-            value  = np.dot( np.dot( matrix, vector ), vector)
-            vector = vector.reshape( (vector.shape[0], 1) )
-            P_matrix = np.identity(n) + (1/np.sqrt(value)-1)*np.dot( vector, vector.T)
-            # Transforms
-            matrix = np.dot( P_matrix, np.dot(matrix, P_matrix) )
-            gradient = np.dot( P_matrix, gradient)
-            unwinding_transformations.append( [P_matrix, lambda P,x : np.dot(P, x)] )
+          vector = self.precond_vectors[i]
+          value  = np.dot( np.dot( matrix, vector ), vector)
+          vector = vector.reshape( (vector.shape[0], 1) )
+          P_matrix=P_matrix+ (1/np.sqrt(value)-1)*np.dot( vector, vector.T)
+        unwinding_transformations.append( [P_matrix, lambda P,x : np.dot(P, x)] )
+        
+        matrix = np.dot( P_matrix, np.dot(matrix, P_matrix) )
+        gradient = np.dot( P_matrix, gradient)
         # end for
 
         # Debug
@@ -155,16 +156,19 @@ class DampedNewton_With_Preconditioner:
         k = len( self.precond_vectors )
         n = self.null_vector.shape[0]
         start=time.time()
+        P_matrix=np.identity(n)
         for i in range(k):
-            vector = self.precond_vectors[i]
-            value  = np.dot( np.dot( matrix, vector ), vector)
-            vector = vector.reshape( (vector.shape[0], 1) )
-            P_matrix = np.identity(n) + (1/np.sqrt(value)-1)*np.dot( vector, vector.T)
-            # Transforms
-            matrix = np.dot( P_matrix, np.dot(matrix, P_matrix) )
-            gradient = np.dot( P_matrix, gradient)
-            unwinding_transformations.append( [P_matrix, lambda P,x : np.dot(P, x)] )
+          vector = self.precond_vectors[i]
+          value  = np.dot( np.dot( matrix, vector ), vector)
+          vector = vector.reshape( (vector.shape[0], 1) )
+          P_matrix=P_matrix+ (1/np.sqrt(value)-1)*np.dot( vector, vector.T)
+        unwinding_transformations.append( [P_matrix, lambda P,x : np.dot(P, x)] )
+        
+        matrix = np.dot( P_matrix, np.dot(matrix, P_matrix) )
+        gradient = np.dot( P_matrix, gradient)
         end1=time.time()
+     
+
         print("\n|--- Time required for preconditioning matrix formation: ", np.round(end1-start,5) ,"s---|")
         # end for
 
@@ -239,7 +243,6 @@ class DampedNewton_With_Preconditioner:
             result = np.vstack( ( np.hstack((A,B)), np.hstack((C,D)) ) )
 
             self.Hessian = -result/self.epsilon
-
             # Inverting Hessian against gradient with preconditioning
             if not timedebug:
               p_k  = self._precond_inversion( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
@@ -248,6 +251,7 @@ class DampedNewton_With_Preconditioner:
               print("\n At iteration: ",i)
               p_k  = self._precond_inversion_debug( result, gradient, iterative_inversion=iterative_inversion, debug=debug)
 
+            end=time.time()
             # print("Outputs")
             # print( np.linalg.norm(p_k-p_k2))
             # print( np.linalg.norm(p_k))
@@ -270,7 +274,6 @@ class DampedNewton_With_Preconditioner:
             alpha = 1
             alpha = self._wolfe1( alpha, p_k_stacked, slope)
             self.alpha.append( alpha )
-
             # Update x = f and g
             self.x = self.x + alpha*p_k_stacked
           
