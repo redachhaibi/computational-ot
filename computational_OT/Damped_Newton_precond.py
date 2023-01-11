@@ -167,7 +167,7 @@ class DampedNewton_With_Preconditioner:
         matrix = np.dot( P_matrix, np.dot(matrix, P_matrix) )
         gradient = np.dot( P_matrix, gradient)
         end1=time.time()
-        print("\n|--- Time required for preconditioning matrix formation: ", np.round(end1-start,5) ,"s---|")
+        print("\n|--- Time required for preconditioning matrix formation: ", np.round(1e3*(end1-start),5) ,"ms---|")
         # end for
 
         start2=time.time()
