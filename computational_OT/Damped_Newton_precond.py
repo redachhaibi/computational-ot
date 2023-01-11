@@ -167,8 +167,6 @@ class DampedNewton_With_Preconditioner:
         matrix = np.dot( P_matrix, np.dot(matrix, P_matrix) )
         gradient = np.dot( P_matrix, gradient)
         end1=time.time()
-     
-
         print("\n|--- Time required for preconditioning matrix formation: ", np.round(end1-start,5) ,"s---|")
         # end for
 
@@ -184,7 +182,7 @@ class DampedNewton_With_Preconditioner:
           print( "List of largest  eigenvalues: ", eig[-5:])
         end2=time.time()
 
-        print("\n|--- Time taken for the debug step: ", np.round(end2-start2,5),"s---|")
+        print("|--- Time taken for the debug step: ", np.round(1e3*(end2-start2),5),"ms---|")
 
         start3=time.time()
         # Solve
@@ -200,7 +198,7 @@ class DampedNewton_With_Preconditioner:
         else:
           p_k=-np.linalg.solve( self.Hessian_stabilized, gradient)
         end3=time.time()
-        print("\n|--- Time taken to evaluate p_k: ",np.round(end3-start3,5),"s---|")
+        print("|--- Time taken to invert the linear system for p_k: ",np.round( 1e3*(end3-start3),5),"ms---|")
 
         start4=time.time()
         # Unwind
@@ -208,9 +206,9 @@ class DampedNewton_With_Preconditioner:
           P,f = transform
           p_k = f(P,p_k)
         end=time.time()
-        print("\n|--- Time taken for unwinding: ",np.round(end-start4,5),"s---|")
+        print("|--- Time taken for unwinding: ",np.round( 1e3*(end-start4),5),"ms---|")
 
-        print("\n|--- Time taken for the complete code block: ",np.round(end-start,2),"s---|")
+        print("|--- Time taken for the complete code block: ",np.round( 1e3*(end-start),2),"ms---|\n")
         return p_k
 
 
