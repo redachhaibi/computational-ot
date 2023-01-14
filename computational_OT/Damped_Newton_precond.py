@@ -61,113 +61,45 @@ class DampedNewton_With_Preconditioner:
       #   |- https://scipy-lectures.org/advanced/interfacing_with_c/interfacing_with_c.html
       #
       # TODO: Complete refactor.
-      def _precond_inversion( self, unnormalized_Hessian, gradient, iterative_inversion=-1, debug=False ):
+      def _precond_inversion_v0( self, unnormalized_Hessian, gradient, iterative_inversion=-1, debug=False ):
 
-        # Record list of unwinding transformations on final result
-        unwinding_transformations = []
-
-        # Construct modified Hessian
-        diag = 1/np.sqrt( np.diag(unnormalized_Hessian).flatten() )
-        self.modified_Hessian = diag[:,None]*unnormalized_Hessian*diag[None,:]
-        
-        # Dummy variable to work on
-        matrix = self.modified_Hessian
-
-        # Preconditioning along null vector
-        vector = self.null_vector
-        vector = vector/diag
-        vector = vector/np.linalg.norm(vector)
-        vector = vector.reshape( (len(vector), 1) )
-        matrix = matrix + np.dot( vector, vector.T)
-        # Transformations
-        gradient = diag[:,None]*gradient
-        unwinding_transformations.append( [diag, lambda d,x : d[:,None]*x])
-        
-        # Conditioning with other vectors
-        k = len( self.precond_vectors )
-        n = self.null_vector.shape[0]
-        P_matrix=np.identity(n)
-        for i in range(k):
-          vector = self.precond_vectors[i]
-          value  = np.dot( np.dot( matrix, vector ), vector)
-          vector = vector.reshape( (vector.shape[0], 1) )
-          P_matrix=P_matrix+ (1/np.sqrt(value)-1)*np.dot( vector, vector.T)
-        unwinding_transformations.append( [P_matrix, lambda P,x : np.dot(P, x)] )
-        
-        matrix = np.dot( P_matrix, np.dot(matrix, P_matrix) )
-        gradient = np.dot( P_matrix, gradient)
-        # end for
-
-        # Debug
-        if debug:
-          eig, v = np.linalg.eigh( matrix )
-          sorting_indices = np.argsort(eig)
-          eig = eig[sorting_indices]
-          v   = v[:, sorting_indices]
-          #
-          print( "List of smallest eigenvalues: ", eig[:5])
-          print( "List of largest  eigenvalues: ", eig[-5:])
-        
-        # Solve
-        self.Hessian_stabilized = -matrix/self.epsilon
-        if iterative_inversion >= 0:
-          accumulator = gradient
-          inverse = gradient
-          delta   = -(matrix-np.identity(n)) # Unipotent part
-          for i in range(iterative_inversion):
-            accumulator = np.dot(delta, accumulator)
-            inverse = inverse + accumulator
-          p_k = self.epsilon*inverse
-        else:
-          p_k=-np.linalg.solve( self.Hessian_stabilized, gradient)
-        
-
-        # Unwind
-        for transform in unwinding_transformations:
-          P,f = transform
-          p_k = f(P,p_k)
-
-        return p_k
-
-      ## Records time
-      def _precond_inversion_debug( self, unnormalized_Hessian, gradient, iterative_inversion=-1, debug=False ):
-
-        # Record list of unwinding transformations on final result
-        unwinding_transformations = []
-
-        # Construct modified Hessian
-        diag = 1/np.sqrt( np.diag(unnormalized_Hessian).flatten() )
-        self.modified_Hessian = diag[:,None]*unnormalized_Hessian*diag[None,:]
-        
-        # Dummy variable to work on
-        matrix = self.modified_Hessian
-
-        # Preconditioning along null vector
-        vector = self.null_vector
-        vector = vector/diag
-        vector = vector/np.linalg.norm(vector)
-        vector = vector.reshape( (len(vector), 1) )
-        matrix = matrix + np.dot( vector, vector.T)
-        # Transformations
-        gradient = diag[:,None]*gradient
-        unwinding_transformations.append( [diag, lambda d,x : d[:,None]*x])
-
-        # Conditioning with other vectors
-        k = len( self.precond_vectors )
-        n = self.null_vector.shape[0]
         start=time.time()
-        P_matrix=np.identity(n)
-        for i in range(k):
-          vector = self.precond_vectors[i]
-          value  = np.dot( np.dot( matrix, vector ), vector)
-          vector = vector.reshape( (vector.shape[0], 1) )
-          P_matrix=P_matrix+ (1/np.sqrt(value)-1)*np.dot( vector, vector.T)
-        unwinding_transformations.append( [P_matrix, lambda P,x : np.dot(P, x)] )
+        # Record list of unwinding transformations on final result
+        unwinding_transformations = []
+
+        # Construct modified Hessian
+        diag = 1/np.sqrt( np.diag(unnormalized_Hessian).flatten() )
+        self.modified_Hessian = diag[:,None]*unnormalized_Hessian*diag[None,:]
         
-        matrix = np.dot( P_matrix, np.dot(matrix, P_matrix) )
-        gradient = np.dot( P_matrix, gradient)
+        # Dummy variable to work on
+        matrix = self.modified_Hessian
+
+        # Preconditioning along null vector
+        vector = self.null_vector
+        vector = vector/diag
+        vector = vector/np.linalg.norm(vector)
+        vector = vector.reshape( (len(vector), 1) )
+        matrix = matrix + np.dot( vector, vector.T)
+        # Transformations
+        gradient = diag[:,None]*gradient
+        unwinding_transformations.append( [diag, lambda d,x : d[:,None]*x])
+
+        # Conditioning with other vectors
+        k = len( self.precond_vectors )
+        n = self.null_vector.shape[0]
+        start1=time.time()
+        for i in range(k):
+            vector = self.precond_vectors[i]
+            value  = np.dot( np.dot( matrix, vector ), vector)
+            vector = vector.reshape( (vector.shape[0], 1) )
+            P_matrix = np.identity(n) + (1/np.sqrt(value)-1)*np.dot( vector, vector.T)
+            # Transforms
+            matrix = np.dot( P_matrix, np.dot(matrix, P_matrix) )
+            gradient = np.dot( P_matrix, gradient)
+            unwinding_transformations.append( [P_matrix, lambda P,x : np.dot(P, x)] )
+        # end for
         end1=time.time()
-        print("\n|--- Time required for preconditioning matrix formation: ", np.round(1e3*(end1-start),5) ,"ms---|")
+        print("\n|--- Time required for preconditioning matrix formation: ", np.round(1e3*(end1-start1),5) ,"ms---|")
         # end for
 
         start2=time.time()
@@ -211,10 +143,178 @@ class DampedNewton_With_Preconditioner:
         print("|--- Time taken for the complete code block: ",np.round( 1e3*(end-start),2),"ms---|\n")
         return p_k
 
+      def _precond_inversion_v1( self, unnormalized_Hessian, gradient, iterative_inversion=-1, debug=False ):
+        start=time.time()
+        # Record list of unwinding transformations on final result
+        unwinding_transformations = []
+
+        # Construct modified Hessian
+        diag = 1/np.sqrt( np.diag(unnormalized_Hessian).flatten() )
+        self.modified_Hessian = diag[:,None]*unnormalized_Hessian*diag[None,:]
+        
+        # Dummy variable to work on
+        matrix = self.modified_Hessian
+
+        # Preconditioning along null vector
+        vector = self.null_vector
+        vector = vector/diag
+        vector = vector/np.linalg.norm(vector)
+        vector = vector.reshape( (len(vector), 1) )
+        matrix = matrix + np.dot( vector, vector.T)
+        # Transformations
+        gradient = diag[:,None]*gradient
+        unwinding_transformations.append( [diag, lambda d,x : d[:,None]*x])
+
+        # Conditioning with other vectors
+        k = len( self.precond_vectors )
+        n = self.null_vector.shape[0]
+        start1=time.time()
+        P_matrix=np.identity(n)
+        for i in range(k):
+          vector = self.precond_vectors[i]
+          value  = np.dot( np.dot( matrix, vector ), vector)
+          vector = vector.reshape( (vector.shape[0], 1) )
+          P_matrix=P_matrix+ (1/np.sqrt(value)-1)*np.dot( vector, vector.T)
+        unwinding_transformations.append( [P_matrix, lambda P,x : np.dot(P, x)] )
+        
+        matrix = np.dot( P_matrix, np.dot(matrix, P_matrix) )
+        gradient = np.dot( P_matrix, gradient)
+        end1=time.time()
+        print("\n|--- Time required for preconditioning matrix formation: ", np.round(1e3*(end1-start1),5) ,"ms---|")
+        # end for
+
+        start2=time.time()
+        # Debug
+        if debug:
+          eig, v = np.linalg.eigh( matrix )
+          sorting_indices = np.argsort(eig)
+          eig = eig[sorting_indices]
+          v   = v[:, sorting_indices]
+          #
+          print( "List of smallest eigenvalues: ", eig[:5])
+          print( "List of largest  eigenvalues: ", eig[-5:])
+        end2=time.time()
+
+        print("|--- Time taken for the debug step: ", np.round(1e3*(end2-start2),5),"ms---|")
+
+        start3=time.time()
+        # Solve
+        self.Hessian_stabilized = -matrix/self.epsilon
+        if iterative_inversion >= 0:
+          accumulator = gradient
+          inverse = gradient
+          delta   = -(matrix-np.identity(n)) # Unipotent part
+          for i in range(iterative_inversion):
+            accumulator = np.dot(delta, accumulator)
+            inverse = inverse + accumulator
+          p_k = self.epsilon*inverse
+        else:
+          p_k=-np.linalg.solve( self.Hessian_stabilized, gradient)
+        end3=time.time()
+        print("|--- Time taken to invert the linear system for p_k: ",np.round( 1e3*(end3-start3),5),"ms---|")
+
+        start4=time.time()
+        # Unwind
+        for transform in unwinding_transformations:
+          P,f = transform
+          p_k = f(P,p_k)
+        end=time.time()
+        print("|--- Time taken for unwinding: ",np.round( 1e3*(end-start4),5),"ms---|")
+
+        print("|--- Time taken for the complete code block: ",np.round( 1e3*(end-start),2),"ms---|\n")
+        return p_k
+
+      def _precond_inversion_v2( self, unnormalized_Hessian, gradient, iterative_inversion=-1, debug=False ):
+        start=time.time()
+        # Record list of unwinding transformations on final result
+        unwinding_transformations = []
+
+        # Construct modified Hessian
+        diag = 1/np.sqrt( np.diag(unnormalized_Hessian).flatten() )
+        self.modified_Hessian = diag[:,None]*unnormalized_Hessian*diag[None,:]
+        
+        # Dummy variable to work on
+        matrix = self.modified_Hessian
+
+        # Preconditioning along null vector
+        vector = self.null_vector
+        vector = vector/diag
+        vector = vector/np.linalg.norm(vector)
+        vector = vector.reshape( (len(vector), 1) )
+        matrix = matrix + np.dot( vector, vector.T)
+
+        # Transformations
+
+        gradient = diag[:,None]*gradient
+        unwinding_transformations.append( [diag, lambda d,x : d[:,None]*x])
 
 
+        # Conditioning with other vectors
+        k = len( self.precond_vectors )
+        n = self.null_vector.shape[0]
+        
+        eigval_vec=np.dot(np.vstack(self.precond_vectors),np.dot(matrix,np.vstack(self.precond_vectors).T))
+        eigval_vec=np.diag(eigval_vec)[:,None]
 
-      def _update(self,tol=1e-11, maxiter=100, iterative_inversion=-1, timedebug=False, debug=False):
+
+        # end for
+
+        start2=time.time()
+        # Debug
+        if debug:
+          eig, v = np.linalg.eigh( matrix )
+          sorting_indices = np.argsort(eig)
+          eig = eig[sorting_indices]
+          v   = v[:, sorting_indices]
+          #
+          print( "List of smallest eigenvalues: ", eig[:5])
+          print( "List of largest  eigenvalues: ", eig[-5:])
+        end2=time.time()
+
+        print("|--- Time taken for the debug step: ", np.round(1e3*(end2-start2),5),"ms---|")
+        # precond_map=lambda x,y,z: x-
+        start3=time.time()
+        # Solve
+        self.Hessian_stabilized = -matrix/self.epsilon
+        if iterative_inversion >= 0:
+          accumulator = gradient
+          inverse = gradient
+          eig_scalars=1-(1/np.sqrt(eigval_vec))#Correct
+          eig_scalars=eig_scalars.reshape(eig_scalars.shape[0],)
+          x=eig_scalars[None,:]*np.vstack(self.precond_vectors).T
+         
+          for i in range(iterative_inversion):           
+            accumulator=self._iterative_precondition(x,accumulator)
+            accumulator=np.dot(matrix,accumulator)
+            accumulator=accumulator-self._iterative_precondition(x,accumulator)
+            inverse=self._iterative_precondition(x,inverse)
+            inverse = inverse + accumulator
+          p_k = self.epsilon*inverse
+        else:
+          p_k=-np.linalg.solve( self.Hessian_stabilized, gradient)
+        end3=time.time()
+        print("|--- Time taken to invert the linear system for p_k: ",np.round( 1e3*(end3-start3),5),"ms---|")
+
+        start4=time.time()
+        # Unwind
+        for transform in unwinding_transformations:
+          P,f = transform
+          p_k = f(P,p_k)
+        end=time.time()
+        print("|--- Time taken for unwinding: ",np.round( 1e3*(end-start4),5),"ms---|")
+
+        print("|--- Time taken for the complete code block: ",np.round( 1e3*(end-start),2),"ms---|\n")
+        return p_k
+
+      def _iterative_precondition(self,x,y):
+        eig_vec_scalar=np.dot(np.vstack(self.precond_vectors),y)
+        eig_vec_scalar=eig_vec_scalar.reshape(eig_vec_scalar.shape[0],)
+        z=x*eig_vec_scalar[None,:]
+        z=np.sum(z,axis=1)[:,None]
+        y=y-z
+        return y
+
+      def _update(self,tol=1e-11, maxiter=100, iterative_inversion=-1, version=1, debug=False):
         
         i=0
         while True :
@@ -233,7 +333,6 @@ class DampedNewton_With_Preconditioner:
             u=u.reshape(u.shape[0],)
             v=v.reshape(v.shape[0],)
             P = u[:,None]*self.K*v[None,:]
-
             A = np.diag( np.array(r1.reshape(r1.shape[0],)) )
             B = P
             C = P.T
@@ -242,12 +341,17 @@ class DampedNewton_With_Preconditioner:
 
             self.Hessian = -result/self.epsilon
             # Inverting Hessian against gradient with preconditioning
-            if not timedebug:
-              p_k  = self._precond_inversion( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
+            if version==2:
+              print("\n At iteration: ",i)
+              p_k  = self._precond_inversion_v2( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
+
+            elif version==1:
+              print("\n At iteration: ",i)
+              p_k  = self._precond_inversion_v1( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
 
             else:
               print("\n At iteration: ",i)
-              p_k  = self._precond_inversion_debug( result, gradient, iterative_inversion=iterative_inversion, debug=debug)
+              p_k  = self._precond_inversion_v0( result, gradient, iterative_inversion=iterative_inversion, debug=debug)
 
             end=time.time()
             # print("Outputs")
