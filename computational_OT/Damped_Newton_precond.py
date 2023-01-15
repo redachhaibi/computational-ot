@@ -307,7 +307,9 @@ class DampedNewton_With_Preconditioner:
 
         print("|--- Time taken for the debug step: ", np.round(1e3*(end2-start2),5),"ms---|")
 
-        start3=time.time()
+        start3=time.time()      
+        end1=time.time()
+
         # Solve
         self.Hessian_stabilized = -matrix/self.epsilon
         if iterative_inversion >= 0:
@@ -363,8 +365,10 @@ class DampedNewton_With_Preconditioner:
         k = len( self.precond_vectors )
         n = self.null_vector.shape[0]
         
-        eigval_vec=np.dot(np.vstack(self.precond_vectors),np.dot(matrix,np.vstack(self.precond_vectors).T))
-        eigval_vec=np.diag(eigval_vec)[:,None]
+        y = np.array( self.precond_vectors ).T # Matrix of size n by k
+        # Compute eigenvalues
+        Ay = np.dot( matrix, y)
+        eigenvalues = np.sum( y * Ay, axis=0 )
 
 
         # end for
@@ -389,9 +393,9 @@ class DampedNewton_With_Preconditioner:
         if iterative_inversion >= 0:
           accumulator = gradient
           inverse = gradient
-          eig_scalars=1-(1/np.sqrt(eigval_vec))#Correct
-          eig_scalars=eig_scalars.reshape(eig_scalars.shape[0],)
-          x=eig_scalars[None,:]*np.vstack(self.precond_vectors).T
+          values=1-(1/np.sqrt(eigenvalues))#Correct
+          values=values.reshape(values.shape[0],)
+          x=values[None,:]*y
          
           for i in range(iterative_inversion):           
             accumulator=self._iterative_precondition(x,accumulator)
@@ -453,7 +457,7 @@ class DampedNewton_With_Preconditioner:
             # Inverting Hessian against gradient with preconditioning
             if version==3:
               print("\n At iteration: ",i)
-              p_k  = self._precond_inversion_v3( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
+              p_k  = self._precond_inversion_v2_mess( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
             if version==2:
               print("\n At iteration: ",i)
               p_k  = self._precond_inversion_v2( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
