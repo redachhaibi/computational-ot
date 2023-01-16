@@ -208,6 +208,7 @@ class DampedNewton_With_Preconditioner:
           accumulator = gradient
           inverse = gradient
           delta   = -(matrix-np.identity(n)) # Unipotent part
+          
           for i in range(iterative_inversion):
             accumulator = np.dot(delta, accumulator)
             inverse = inverse + accumulator
