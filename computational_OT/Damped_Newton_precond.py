@@ -172,19 +172,19 @@ class DampedNewton_With_Preconditioner:
         # Conditioning with other vectors
         k = len( self.precond_vectors )
         n = self.null_vector.shape[0]
-        start1=time.time()
-        P_matrix=np.identity(n)
+        start1 = time.time()
+        P_matrix = np.identity(n)
         for i in range(k):
           vector = self.precond_vectors[i]
           value  = np.dot( np.dot( matrix, vector ), vector)
           vector = vector.reshape( (vector.shape[0], 1) )
-          P_matrix=P_matrix+ (1/np.sqrt(value)-1)*np.dot( vector, vector.T)
+          P_matrix = P_matrix+ (1/np.sqrt(value)-1)*np.dot( vector, vector.T)
         # end for
         unwinding_transformations.append( [P_matrix, lambda P,x : np.dot(P, x)] )
         
         matrix = np.dot( P_matrix, np.dot(matrix, P_matrix) )
         gradient = np.dot( P_matrix, gradient)
-        end1=time.time()
+        end1 = time.time()
         print("|--- Time required for preconditioning matrix formation: ", np.round(1e3*(end1-start1),5) ,"ms---|")
 
         start2=time.time()
@@ -426,7 +426,10 @@ class DampedNewton_With_Preconditioner:
         # Construct modified Hessian
         diag = 1/np.sqrt( np.diag(unnormalized_Hessian).flatten() )
         self.modified_Hessian = diag[:,None]*unnormalized_Hessian*diag[None,:]
-        
+        # Transformations
+        gradient = diag[:,None]*gradient
+        unwinding_transformations.append( [diag, lambda d,x : d[:,None]*x])
+       
         # Dummy variable to work on
         matrix = self.modified_Hessian
 
@@ -437,23 +440,16 @@ class DampedNewton_With_Preconditioner:
         vector = vector.reshape( (len(vector), 1) )
         matrix = matrix + np.dot( vector, vector.T)
 
-        # Transformations
-
-        gradient = diag[:,None]*gradient
-        unwinding_transformations.append( [diag, lambda d,x : d[:,None]*x])
-
-
         # Conditioning with other vectors
         k = len( self.precond_vectors )
         n = self.null_vector.shape[0]
-        
         y = np.vstack( self.precond_vectors ).T # Matrix of size n by k
         # Compute eigenvalues
         Ay = np.dot( matrix, y)
         eigenvalues = np.sum( y * Ay, axis=0 )
 
-
-        # end for
+        end0 = time.time()
+        print("\n|--- Time required for all preconditioning: ", np.round(1e3*(end0-start),5) ,"ms---|")
 
         start2=time.time()
         # Debug
@@ -501,6 +497,20 @@ class DampedNewton_With_Preconditioner:
 
         print("|--- Time taken for the complete code block: ",np.round( 1e3*(end-start),2),"ms---|\n")
         return p_k
+
+      # Function mapping v to P(A+E)Pv
+      def _preconditioned_map(self, vector):
+        vector = self._apply_P( vector ) 
+        vector = np.dot( self.A, vector) + np.dot( self.E, v) # Correct this easily
+        vector = self._apply_P( vector ) 
+        return vector
+      
+      def _apply_P(self, vector):
+        # Correct order?
+        vector = vector - BLABLA
+        vector = vector*self.diag_part
+        return vector    
+
 
       def _iterative_precondition(self,x,y):
         eig_vec_scalar=np.dot(np.vstack(self.precond_vectors),y)
