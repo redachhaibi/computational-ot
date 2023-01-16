@@ -336,7 +336,7 @@ class DampedNewton_With_Preconditioner:
         print("|--- Time taken for the complete code block: ",np.round( 1e3*(end-start),2),"ms---|\n")
         return p_k
 
-      def _precond_inversion_v2_mess( self, unnormalized_Hessian, gradient, iterative_inversion=-1, debug=False ):
+      def _precond_inversion_v3( self, unnormalized_Hessian, gradient, iterative_inversion=-1, debug=False ):
         start=time.time()
         # Record list of unwinding transformations on final result
         unwinding_transformations = []
@@ -365,7 +365,7 @@ class DampedNewton_With_Preconditioner:
         k = len( self.precond_vectors )
         n = self.null_vector.shape[0]
         
-        y = np.array( self.precond_vectors ).T # Matrix of size n by k
+        y = np.vstack( self.precond_vectors ).T # Matrix of size n by k
         # Compute eigenvalues
         Ay = np.dot( matrix, y)
         eigenvalues = np.sum( y * Ay, axis=0 )
@@ -457,7 +457,7 @@ class DampedNewton_With_Preconditioner:
             # Inverting Hessian against gradient with preconditioning
             if version==3:
               print("\n At iteration: ",i)
-              p_k  = self._precond_inversion_v2_mess( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
+              p_k  = self._precond_inversion_v3( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
             if version==2:
               print("\n At iteration: ",i)
               p_k  = self._precond_inversion_v2( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
