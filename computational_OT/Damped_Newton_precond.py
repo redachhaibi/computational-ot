@@ -552,9 +552,13 @@ class DampedNewton_With_Preconditioner:
             elif version==0:
               print("\n At iteration: ",i)
               p_k  = self._precond_inversion_v0( result, gradient, iterative_inversion=iterative_inversion, debug=debug)
+            
             else:
+              print("\n At iteration: ",i)
               p_k  = self._precond_inversion_v2( result, gradient, iterative_inversion=iterative_inversion, debug=debug)
 
+
+            
             end=time.time()
             # print("Outputs")
             # print( np.linalg.norm(p_k-p_k2))
