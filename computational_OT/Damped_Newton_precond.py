@@ -3,7 +3,7 @@ from numpy import linalg as Lin
 import scipy
 import logging
 import time
-from scipy.sparse.linalg import cg,LinearOperator
+from scipy.sparse.linalg import cg,LinearOperator,gmres
 
 class DampedNewton_With_Preconditioner:
       def __init__(self,K,a,b,f,g,epsilon,rho,c,null_vector,precond_vectors):
@@ -538,7 +538,99 @@ class DampedNewton_With_Preconditioner:
         print("|--- Time taken for the complete code block: ",np.round( 1e3*(end-start),2),"ms---|\n")
         return p_k,(t1,t2,t3,t4,t5,t_all)
 
-      
+      def _precond_inversion_v3_2( self, unnormalized_Hessian, gradient, iterative_inversion=-1, debug=False ):
+        
+        def mv(vector):
+            return np.dot(self.m,vector) 
+
+        start = time.time()
+        # Record list of unwinding transformations on final result
+        unwinding_transformations = []
+
+        # Construct modified Hessian
+        diag = 1/np.sqrt( np.diag(unnormalized_Hessian).flatten() )
+        self.modified_Hessian = diag[:,None]*unnormalized_Hessian*diag[None,:]
+        
+        # Dummy variable to work on
+        matrix = self.modified_Hessian
+
+        # Preconditioning along null vector
+        vector = self.null_vector
+        vector = vector/diag
+        vector = vector/np.linalg.norm(vector)
+        vector = vector.reshape( (len(vector), 1) )
+        matrix = matrix + np.dot( vector, vector.T)
+        # Transformations
+        gradient = diag[:,None]*gradient
+        unwinding_transformations.append( [diag, lambda d,x : d[:,None]*x])
+        end0=time.time()
+        t1=np.round(1e3*(end0-start),5)
+        print("\n|--- Time required for initial preconditioning: ", np.round(1e3*(end0-start),5) ,"ms---|")
+
+
+        # Conditioning with other vectors
+        #  Naming conventions:
+        #  y = Preconditioning vectors as a numpy matrix n by k
+        #  matrix = our matrix A to precondition
+        k = len( self.precond_vectors )
+        n = self.null_vector.shape[0]
+        start1=time.time()
+        y = np.array( self.precond_vectors ).T # Matrix of size n by k
+        # Compute eigenvalues
+        Ay = np.dot( matrix, y)
+        eigenvalues = np.sum( y * Ay, axis=0 )
+        # Compute P_matrix = id + y*diag(values)*y.T
+        values = (1/np.sqrt(eigenvalues)-1)    # Vector of size k
+        z = y*values[None,:]
+        P_matrix = np.identity(n) + np.dot( z, y.T)
+        # Done
+        end1 = time.time()
+        unwinding_transformations.append( [P_matrix, lambda P,x : np.dot(P, x)] )
+        t2=np.round(1e3*(end1-start1),5)
+        print("|--- Time required for preconditioning matrix formation: ", np.round(1e3*(end1-start1),5) ,"ms---|")
+
+        # Changing A=matrix to PAP
+        start11 = time.time()
+        # PAP = (id + y*diag(values)*y.T)*A*(id + y*diag(values)*y.T)
+        #     = A + A*y*diag(values)*y.T + y*diag(values)*(A*y).T + y*diag(values)*y.T*A*y*diag(values)*y.T
+        B = np.dot( Ay, z.T)
+        C = z @ np.dot(y.T, Ay) @ z.T
+        matrix = matrix + B + B.T + C
+        # gradient = np.dot( P_matrix, gradient)
+        gradient = np.dot( P_matrix, gradient)
+        end11=time.time()
+        t3= np.round(1e3*(end11-start11),5)
+        print("|--- Time required for changing A to PAP: ", np.round(1e3*(end11-start11),5) ,"ms---|")
+
+        start3=time.time()
+        # Solve either iteratively using CG or exactly
+        self.Hessian_stabilized = -matrix/self.epsilon
+        if iterative_inversion >= 0:
+          self.m = matrix
+          A = LinearOperator((self.m.shape[0],self.m.shape[1]), matvec=mv)
+          inverse, exit_code = gmres(A, gradient, x0=gradient, maxiter=iterative_inversion, tol=1e-10)
+          print( "  --- CG exit code: ", exit_code)
+          p_k = self.epsilon*inverse
+          p_k = p_k.reshape( (p_k.shape[0], 1) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
+        else:
+          p_k=-np.linalg.solve( self.Hessian_stabilized, gradient)
+        end3=time.time()
+        t4=np.round( 1e3*(end3-start3),5)
+        print("|--- Time taken to invert the linear system for p_k: ",np.round( 1e3*(end3-start3),5),"ms---|")
+
+        start4=time.time()
+        # Unwind
+        for transform in unwinding_transformations:
+          P,f = transform
+          p_k = f(P,p_k)
+        end=time.time()
+        t5=np.round( 1e3*(end-start4),5)
+        print("|--- Time taken for unwinding: ",np.round( 1e3*(end-start4),5),"ms---|")
+        t_all=np.round( 1e3*(end-start),2)
+
+        print("|--- Time taken for the complete code block: ",np.round( 1e3*(end-start),2),"ms---|\n")
+        return p_k,(t1,t2,t3,t4,t5,t_all)
+
       def _precond_inversion_v4( self, unnormalized_Hessian, gradient, iterative_inversion=-1, debug=False ):
         start=time.time()
         # Record list of unwinding transformations on final result
