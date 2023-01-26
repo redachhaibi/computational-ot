@@ -1,9 +1,14 @@
 import numpy as np
-from numpy import linalg as Lin
+
+# NO
+# from numpy import linalg as Lin
+
 import scipy
 import logging
 import time
-from scipy.sparse.linalg import cg,LinearOperator,gmres
+
+# NO
+# from scipy.sparse.linalg import cg,LinearOperator,gmres
 
 class DampedNewton_With_Preconditioner:
       def __init__(self,K,a,b,f,g,epsilon,rho,c,null_vector,precond_vectors):
@@ -449,9 +454,7 @@ class DampedNewton_With_Preconditioner:
         return p_k,t
 
       def _precond_inversion_v3_1( self, unnormalized_Hessian, gradient, iterative_inversion=-1, debug=False ):
-        t=[]
-        def mv(vector):
-            return np.dot(matrix,vector) 
+        timings = []
 
         start = time.time()
         # Record list of unwinding transformations on final result
@@ -473,9 +476,11 @@ class DampedNewton_With_Preconditioner:
         # Transformations
         gradient = diag[:,None]*gradient
         unwinding_transformations.append( [diag, lambda d,x : d[:,None]*x])
-        end0=time.time()
-        t.append(np.round(1e3*(end0-start),5))
-        print("\n|--- Time required for initial preconditioning: ", np.round(1e3*(end0-start),5) ,"ms---|")
+        # Record timing
+        end = time.time()
+        interval = 1e3*(end-start)
+        timings.append( interval )
+        print("\n|--- Time required for initial preconditioning: ", np.round(interval,5) ,"ms---|")
 
 
         # Conditioning with other vectors
@@ -484,7 +489,7 @@ class DampedNewton_With_Preconditioner:
         #  matrix = our matrix A to precondition
         k = len( self.precond_vectors )
         n = self.null_vector.shape[0]
-        start1=time.time()
+        start0 = time.time()
         y = np.array( self.precond_vectors ).T # Matrix of size n by k
         # Compute eigenvalues
         Ay = np.dot( matrix, y)
@@ -494,10 +499,12 @@ class DampedNewton_With_Preconditioner:
         z = y*values[None,:]
         P_matrix = np.identity(n) + np.dot( z, y.T)
         # Done
-        end1 = time.time()
         unwinding_transformations.append( [P_matrix, lambda P,x : np.dot(P, x)] )
-        t.append(np.round(1e3*(end1-start1),5))
-        print("|--- Time required for preconditioning matrix formation: ", np.round(1e3*(end1-start1),5) ,"ms---|")
+        # Record timings
+        end = time.time()
+        interval = 1e3*(end-start0)
+        timings.append( interval )
+        print("|--- Time required for preconditioning matrix formation: ", np.round(interval,5) ,"ms---|")
 
         # Changing A=matrix to PAP
         start11 = time.time()
@@ -513,6 +520,10 @@ class DampedNewton_With_Preconditioner:
 
         start3=time.time()
         # Solve either iteratively using CG or exactly
+
+        def mv(vector):
+            return np.dot(matrix,vector) 
+
         self.Hessian_stabilized = -matrix/self.epsilon
         if iterative_inversion >= 0:
           self.m = matrix
@@ -538,7 +549,7 @@ class DampedNewton_With_Preconditioner:
         t.append(np.round( 1e3*(end-start),2))
 
         print("|--- Time taken for the complete code block: ",np.round( 1e3*(end-start),2),"ms---|\n")
-        return p_k,t
+        return p_k, t
 
       def _precond_inversion_v3_2( self, unnormalized_Hessian, gradient, iterative_inversion=-1, debug=False ):
         t=[]
@@ -855,6 +866,16 @@ class DampedNewton_With_Preconditioner:
             else:
                 print("Terminating after iteration: ",i+1)
                 break
-        return [self.x[:self.a.shape[0]],self.x[self.a.shape[0]:],self.err_a,self.err_b ,self.objvalues,self.alpha,self.t]
+
+        return {
+          "potential_f": self.x[:self.a.shape[0]],
+          "potential_g": self.x[self.a.shape[0]:],
+          "error_a"    : self.err_a,
+          "error_b"    : self.err_b,
+          "objectives" : self.objvalues,
+          "linesearch_steps": self.alpha,
+          "timings"    : self.t
+        }
+        #return [self.x[:self.a.shape[0]],self.x[self.a.shape[0]:],self.err_a,self.err_b ,self.objvalues,self.alpha,self.t]
 
  # end for    
