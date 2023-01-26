@@ -20,7 +20,7 @@ class DampedNewton_With_Preconditioner:
         self.err_a=[]
         self.err_b=[] 
         self.objvalues=[] 
-  
+        self.t=[]
        
 
 
@@ -748,7 +748,6 @@ class DampedNewton_With_Preconditioner:
       def _update(self,tol=1e-11, maxiter=100, iterative_inversion=-1, version=1, debug=False):
         
         i = 0
-        t= []
         while True :
             grad_f = self._computegradientf(self.x[:self.a.shape[0]])
             grad_g = self._computegradientg(self.x[self.a.shape[0]:])
@@ -776,40 +775,40 @@ class DampedNewton_With_Preconditioner:
             if version==4:
               print("\n At iteration: ",i)
               p_k,temp = self._precond_inversion_v4( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
-              t.append(temp)
+              self.t.append(temp)
             
             elif version==3.2:
               print("\n At iteration: ",i)
               p_k,temp = self._precond_inversion_v3_2( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
-              t.append(temp)
+              self.t.append(temp)
 
 
             elif version==3.1:
               print("\n At iteration: ",i)
               p_k,temp = self._precond_inversion_v3_1( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
-              t.append(temp)
+              self.t.append(temp)
 
             elif version==3:
               print("\n At iteration: ",i)
               p_k,temp  = self._precond_inversion_v3( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
-              t.append(temp)
+              self.t.append(temp)
             elif version == 2:
               print("\n At iteration: ",i)
               p_k,temp  = self._precond_inversion_v2( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
-              t.append(temp)
+              self.t.append(temp)
             elif version == 1:
               print("\n At iteration: ",i)
               p_k,temp  = self._precond_inversion_v1( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
-              t.append(temp)
+              self.t.append(temp)
             elif version == 0:
               print("\n At iteration: ",i)
               p_k,temp  = self._precond_inversion_v0( result, gradient, iterative_inversion=iterative_inversion, debug=debug)
-              t.append(temp)
+              self.t.append(temp)
 
             else:
               print("\n At iteration: ",i)
               p_k,temp  = self._precond_inversion_v2( result, gradient, iterative_inversion=iterative_inversion, debug=debug)
-              t.append(temp)
+              self.t.append(temp)
 
 
             
@@ -856,7 +855,6 @@ class DampedNewton_With_Preconditioner:
             else:
                 print("Terminating after iteration: ",i+1)
                 break
-
-        return self.x[:self.a.shape[0]],self.x[self.a.shape[0]:],self.err_a,self.err_b ,self.objvalues,self.alpha,t
+        return [self.x[:self.a.shape[0]],self.x[self.a.shape[0]:],self.err_a,self.err_b ,self.objvalues,self.alpha,self.t]
 
  # end for    
