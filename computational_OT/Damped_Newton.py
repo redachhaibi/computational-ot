@@ -185,7 +185,7 @@ class DampedNewton:
           "error_a"     : self.err_a,
           "error_b"     : self.err_b,
           "objectives"  : self.objvalues,
-          "Linesearch_step" : self.alpha       
+          "linesearch_steps" : self.alpha       
         }    
         
 #Footer
