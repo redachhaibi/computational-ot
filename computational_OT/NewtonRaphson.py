@@ -3,15 +3,15 @@ import numpy as np
 
 class NewtonRaphson:
     def __init__(self,x,K,a,b,epsilon):
-        self.x=x
-        self.K=K
-        self.a=a
-        self.b=b
-        self.N1=a.shape[0]
-        self.N2=b.shape[0]
-        self.epsilon=epsilon
-        self.err_a=[]
-        self.err_b=[]
+        self.x = x
+        self.K = K
+        self.a = a
+        self.b = b
+        self.N1 = a.shape[0]
+        self.N2 = b.shape[0]
+        self.epsilon = epsilon
+        self.err_a = []
+        self.err_b = []
     
     def _func_phi(self):
         y = np.exp(self.x/self.epsilon)
@@ -100,10 +100,13 @@ class NewtonRaphson:
             self.err_a.append(e[0])
             self.err_b.append(e[1])
 
-            iter_condition=(e[0]>tol or e[1]>tol)
-            if iter_condition and i< maxiter:
-                i+=1
+            iter_condition = (e[0]>tol or e[1]>tol)
+            if iter_condition and i < maxiter:
+                i += 1
             else:
                 break
-        return self.err_a,self.err_b
+        return {
+            'error_a' : self.err_a,
+            'error_b' : self.err_b,
+        }
 

@@ -5,27 +5,27 @@ from numpy import linalg as Lin
 class Sinkhorn:
 
   def __init__(self,K,a,b,u,v,epsilon):
-    self.K=K
-    self.a=a
-    self.b=b
-    self.u=u
-    self.v=v
-    self.epsilon=epsilon
-    self.err_a=[]
-    self.err_b=[]
-    self.obj=[]
+    self.K = K
+    self.a = a
+    self.b = b
+    self.u = u
+    self.v = v
+    self.epsilon = epsilon
+    self.err_a = []
+    self.err_b = []
+    self.obj = []
     
   def _objectivefunction(self):
         """Computes the value of the objective function at x"""
-        f=np.log(self.u)*self.epsilon
-        g=np.log(self.v)*self.epsilon
-        target=np.dot(f.T,self.a)+np.dot(g.T,self.b)
-        penalization=-self.epsilon*np.dot(np.exp(f/self.epsilon).T,np.dot(self.K,np.exp(g/self.epsilon)))
+        f = np.log(self.u)*self.epsilon
+        g = np.log(self.v)*self.epsilon
+        target = np.dot(f.T,self.a)+np.dot(g.T,self.b)
+        penalization = -self.epsilon*np.dot(np.exp(f/self.epsilon).T,np.dot(self.K,np.exp(g/self.epsilon)))
         return target+ penalization
 
 
   def _update(self, tol=1e-12, maxiter=1000):
-    i=0
+    i = 0
     while True :
       self.obj.append(self._objectivefunction())
 
@@ -42,12 +42,17 @@ class Sinkhorn:
       s = self.u*np.dot( self.K, self.v )
       self.err_a.append(Lin.norm(s - self.a))
 
-      iter_condition=(self.err_a[-1]>tol or self.err_b[-1]>tol)
+      iter_condition = (self.err_a[-1]>tol or self.err_b[-1]>tol)
       if iter_condition and i<maxiter :
-          i+=1
+          i += 1
       else:
         break   
 
     # end for
-    return self.u,self.v,self.err_a,self.err_b,self.obj
-    
+    return {
+      'u' : self.u,
+      'v' : self.v,
+      'error_a' : self.err_a,
+      'error_b' : self.err_b,
+      'objectives' : self.obj
+    }
