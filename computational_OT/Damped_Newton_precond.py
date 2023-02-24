@@ -598,6 +598,114 @@ class DampedNewton_With_Preconditioner:
         print("|--- Time taken for the complete code block: ",np.round( interval,2),"ms---|\n")
         return p_k, timings
       
+      def _precond_inversion( self, unnormalized_Hessian, gradient, iterative_inversion=-1, debug=False,optType =None ):
+        timings = []
+
+        start = time.time()
+        # Record list of unwinding transformations on final result
+        unwinding_transformations = []
+
+        # Construct modified Hessian
+        diag = 1/np.sqrt( np.diag(unnormalized_Hessian).flatten() )
+        self.modified_Hessian = diag[:,None]*unnormalized_Hessian*diag[None,:]
+        
+        # Dummy variable to work on
+        matrix = self.modified_Hessian
+
+        # Preconditioning along null vector
+        vector = self.null_vector
+        vector = vector/diag
+        vector = vector/np.linalg.norm(vector)
+        vector_E = vector
+        # Transformations (Initial on gradient and final on result)
+        gradient = diag[:,None]*gradient
+        unwinding_transformations.append( lambda x : diag[:,None]*x )
+        # Record timing
+        end = time.time()
+        interval = 1e3*(end-start)
+        timings.append( interval )
+
+        # Conditioning with other vectors
+        #  Naming conventions:
+        #  y = Preconditioning vectors as a numpy matrix n by k
+        #  matrix = our matrix A to precondition
+        #  We only form the data y and z such that
+        #  P = id + z*y.T
+        k = len( self.precond_vectors )
+        n = self.null_vector.shape[0]
+        start0 = time.time()
+        y = np.array( self.precond_vectors ).T # Matrix of size n by k
+        # Compute eigenvalues
+        Ay = np.dot( matrix, y)
+        eigenvalues = np.sum( y * Ay, axis=0 )
+        # Compute data for P = id + y*diag(values)*y.T
+        values = (1/np.sqrt(eigenvalues)-1)    # Vector of size k
+        z = y*values[None,:]
+        # Record timings
+        end = time.time()
+        interval = 1e3*(end-start0)
+        timings.append( interval )
+
+        # Changing A=matrix to PAP
+        start2 = time.time()
+
+        # Function mapping v to Pv
+        # P = Id + z*y.T
+        def _apply_P(vector):
+          return vector + z @ ( y.T @ vector)
+        
+        # Function mapping v to P(A+E)Pv
+        # A is matrix
+        # E is vector_E*vector_E.T
+        def _preconditioned_map(vector):
+          vector = _apply_P( vector ) 
+          vector = np.dot( matrix, vector)  + vector_E*np.dot(vector_E, vector)
+          vector = _apply_P( vector ) 
+          return vector
+        
+        # Apply P
+        # At beginning on gradient
+        # At the end 
+        gradient = _apply_P(gradient)
+        unwinding_transformations.append( lambda x : _apply_P(x) )
+        end=time.time()
+        interval = 1e3*(end-start2)
+        timings.append( interval )
+                
+        #
+        # Solve either iteratively using CG or exactly
+        start3 = time.time()
+        self.Hessian_stabilized = -matrix/self.epsilon
+        if iterative_inversion >= 0:
+          self.m = matrix
+          A = scipy.sparse.linalg.LinearOperator( ( self.m.shape[0],self.m.shape[1] ), matvec=_preconditioned_map ) 
+          if optType == 'cg':
+            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0=gradient, maxiter=iterative_inversion, tol=1e-10 )
+            # print( "  --- CG exit code: ", exit_code)
+          else:
+            inverse, exit_code = scipy.sparse.linalg.gmres( A, gradient, x0=gradient, maxiter=iterative_inversion, tol=1e-10 )
+            # print( "  --- GMRES exit code: ", exit_code)
+          p_k = self.epsilon*inverse
+          p_k = p_k.reshape( (p_k.shape[0], 1) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
+        else:
+          p_k = -np.linalg.solve( self.Hessian_stabilized, gradient)
+        end = time.time()
+        interval = 1e3*(end-start3)
+        timings.append(interval)
+
+        start4 = time.time()
+        # Unwind
+        for transform in unwinding_transformations:
+          p_k = transform(p_k)
+        end = time.time()
+        interval = 1e3*(end-start4)
+        timings.append( interval )
+        interval = 1e3*(end-start)
+        timings.append( interval )
+
+        # print("|--- Time taken for the complete code block: ",np.round( interval,2),"ms---|\n")
+        return p_k, timings
+
       def _update(self,tol=1e-11, maxiter=100, iterative_inversion=-1, version=1, debug=False, optType='cg'):
         
         i = 0
@@ -633,7 +741,6 @@ class DampedNewton_With_Preconditioner:
                                                       debug = debug, 
                                                       optType = optType )
               self.timing.append(temp)
-           
             elif version == 3:
               print("\n At iteration: ",i)
               p_k, temp = self._precond_inversion_v3( result, 
@@ -642,7 +749,6 @@ class DampedNewton_With_Preconditioner:
                                                       debug = debug, 
                                                       optType = optType )
               self.timing.append(temp)
-
             elif version == 2:
               print("\n At iteration: ",i)
               p_k,temp  = self._precond_inversion_v2( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
@@ -655,11 +761,15 @@ class DampedNewton_With_Preconditioner:
               print("\n At iteration: ",i)
               p_k,temp  = self._precond_inversion_v0( result, gradient, iterative_inversion=iterative_inversion, debug=debug)
               self.timing.append(temp)
-
             else:
-              print("\n At iteration: ",i)
-              p_k,temp  = self._precond_inversion_v2( result, gradient, iterative_inversion=iterative_inversion, debug=debug)
+              #print("At iteration: ",i)
+              p_k, temp = self._precond_inversion( result, 
+                                                  gradient, 
+                                                  iterative_inversion=iterative_inversion, 
+                                                  debug = debug, 
+                                                  optType = optType )
               self.timing.append(temp)
+
 
 
             
