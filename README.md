@@ -20,6 +20,8 @@ The repository is structured as follows. We only describe the most important fil
 |-- ipynb: Contains Python notebooks which demonstrate how the code works
 |  |-- DampedNewton.ipynb: Illustration of the method (Self explanatory).
 |  |-- DampedNewtonPreconditioning.ipynb: Illustration of the method (Self explanatory).
+|  |-- DampedNewtonPreconditioningBeta.ipynb: Initial draft printing all the spectral statistics.
+|  |-- DampedNewtonPreconditioningTesting.ipynb: Full testing, even with obsolete versions.
 |  |-- Demo.ipynb: Illustrates the various methods, in particular, Sinkhorn, Gradient ascent (fixed or line search), L-BGFS, Newton...
 |  |-- Multiscale.ipynb: Exploring multiscale resolution
 |  |-- NewtonSparsity*.ipynb: Exploring sparsity as $\epsilon$ goes to zero

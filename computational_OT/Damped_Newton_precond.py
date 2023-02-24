@@ -483,23 +483,18 @@ class DampedNewton_With_Preconditioner:
 
         print("|--- Time taken for the complete code block: ",np.round( interval,2),"ms---|\n")
         return p_k, timings
-
-
-     
-      def _precond_inversion_v4( self, unnormalized_Hessian, gradient, iterative_inversion=-1, debug=False ):
+      
+      def _precond_inversion_v4( self, unnormalized_Hessian, gradient, iterative_inversion=-1, debug=False,optType =None ):
         timings = []
+
         start = time.time()
         # Record list of unwinding transformations on final result
         unwinding_transformations = []
 
-        
         # Construct modified Hessian
         diag = 1/np.sqrt( np.diag(unnormalized_Hessian).flatten() )
         self.modified_Hessian = diag[:,None]*unnormalized_Hessian*diag[None,:]
-        # Transformations
-        gradient = diag[:,None]*gradient
-        unwinding_transformations.append( [diag, lambda d,x : d[:,None]*x])
-       
+        
         # Dummy variable to work on
         matrix = self.modified_Hessian
 
@@ -507,103 +502,103 @@ class DampedNewton_With_Preconditioner:
         vector = self.null_vector
         vector = vector/diag
         vector = vector/np.linalg.norm(vector)
-        vector = vector.reshape( (len(vector), 1) )
-        matrix = matrix + np.dot( vector, vector.T)
-
-        # Conditioning with other vectors
-        k = len( self.precond_vectors )
-        n = self.null_vector.shape[0]
-        self.y = np.array( self.precond_vectors ).T # Matrix of size n by k
-        # Compute eigenvalues
-        Ay = np.dot( matrix, self.y)
-        eigenvalues = np.sum( self.y * Ay, axis=0 )
-
+        vector_E = vector
+        # Transformations (Initial on gradient and final on result)
+        gradient = diag[:,None]*gradient
+        unwinding_transformations.append( lambda x : diag[:,None]*x )
+        # Record timing
         end = time.time()
         interval = 1e3*(end-start)
-        timings.append(interval)
-        print("\n|--- Time required for all preconditioning: ", np.round( interval,5 ) ,"ms---|")
+        timings.append( interval )
+        print("\n|--- Time required for initial preconditioning: ", np.round(interval,5) ,"ms---|")
 
-        start2 = time.time()
-        # Debug
-        if debug:
-          eig, v = np.linalg.eigh( matrix )
-          sorting_indices = np.argsort(eig)
-          eig = eig[sorting_indices]
-          v   = v[:, sorting_indices]
-          #
-          print( "List of smallest eigenvalues: ", eig[:5])
-          print( "List of largest  eigenvalues: ", eig[-5:])
+
+        # Conditioning with other vectors
+        #  Naming conventions:
+        #  y = Preconditioning vectors as a numpy matrix n by k
+        #  matrix = our matrix A to precondition
+        #  We only form the data y and z such that
+        #  P = id + z*y.T
+        k = len( self.precond_vectors )
+        n = self.null_vector.shape[0]
+        start0 = time.time()
+        y = np.array( self.precond_vectors ).T # Matrix of size n by k
+        # Compute eigenvalues
+        Ay = np.dot( matrix, y)
+        eigenvalues = np.sum( y * Ay, axis=0 )
+        # Compute data for P = id + y*diag(values)*y.T
+        values = (1/np.sqrt(eigenvalues)-1)    # Vector of size k
+        z = y*values[None,:]
+        # Record timings
         end = time.time()
+        interval = 1e3*(end-start0)
+        timings.append( interval )
+        print( "|--- Time required for preconditioning matrix formation: ", np.round(interval,5) ,"ms---|" )
+
+        # Changing A=matrix to PAP
+        start2 = time.time()
+
+        # Function mapping v to Pv
+        # P = Id + z*y.T
+        def _apply_P(vector):
+          return vector + z @ ( y.T @ vector)
+        
+        # Function mapping v to P(A+E)Pv
+        # A is matrix
+        # E is vector_E*vector_E.T
+        def _preconditioned_map(vector):
+          vector = _apply_P( vector ) 
+          vector = np.dot( matrix, vector)  + vector_E*np.dot(vector_E, vector)
+          vector = _apply_P( vector ) 
+          return vector
+        
+        # Apply P
+        # At beginning on gradient
+        # At the end 
+        gradient = _apply_P(gradient)
+        unwinding_transformations.append( lambda x : _apply_P(x) )
+        end=time.time()
         interval = 1e3*(end-start2)
         timings.append( interval )
-
-        print("|--- Time taken for the debug step: ", np.round( interval,5),"ms---|")
-        # precond_map=lambda x,y,z: x-
+        print( "|--- Time required for changing A to PAP: ", np.round( interval,5 ) ,"ms---|" )
+                
+        #
+        # Solve either iteratively using CG or exactly
         start3 = time.time()
-        # Solve
         self.Hessian_stabilized = -matrix/self.epsilon
         if iterative_inversion >= 0:
-          accumulator = gradient
-          inverse = gradient
-          self.eigvalues = 1-(1/np.sqrt(eigenvalues))#Correct
-          self.eigvalues = self.eigvalues.reshape(self.eigvalues.shape[0],)
-          self.eigscalar_vec = self.eigvalues[None,:]*self.y
           self.m = matrix
-
-          x = self.preconditioned_map(inverse)
-          print(x.shape)
-          # for i in range(iterative_inversion):           
-          #   z=self._iterative_precondition(x,accumulator)
-          #   accumu=np.dot(matrix,accumulator)
-          #   accumulator=accumulator-self._iterative_precondition(x,accumulator)
-          #   inverse=self._iterative_precondition(x,inverse)
-          #   inverse = inverse + accumulator
-          # p_k = self.epsilon*inverse
+          A = scipy.sparse.linalg.LinearOperator( ( self.m.shape[0],self.m.shape[1] ), matvec=_preconditioned_map ) 
+          if optType == 'cg':
+            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0=gradient, maxiter=iterative_inversion, tol=1e-10 )
+            print( "  --- CG exit code: ", exit_code)
+          else:
+            inverse, exit_code = scipy.sparse.linalg.gmres( A, gradient, x0=gradient, maxiter=iterative_inversion, tol=1e-10 )
+            print( "  --- GMRES exit code: ", exit_code)
+          p_k = self.epsilon*inverse
+          p_k = p_k.reshape( (p_k.shape[0], 1) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
         else:
           p_k = -np.linalg.solve( self.Hessian_stabilized, gradient)
         end = time.time()
         interval = 1e3*(end-start3)
-        timings.append( interval )
-        print("|--- Time taken to invert the linear system for p_k: ",np.round( interval,5),"ms---|")
+        timings.append(interval)
+        print( "|--- Time taken to invert the linear system for p_k: ",np.round( interval,5),"ms---|" )
 
         start4 = time.time()
         # Unwind
         for transform in unwinding_transformations:
-          P,f = transform
-          p_k = f(P,p_k)
+          p_k = transform(p_k)
         end = time.time()
         interval = 1e3*(end-start4)
         timings.append( interval )
-        print("|--- Time taken for unwinding: ",np.round( interval,5),"ms---|")
+        print("|--- Time taken for unwinding: ",np.round( interval ,5 ) ,"ms---|")
         interval = 1e3*(end-start)
         timings.append( interval )
 
         print("|--- Time taken for the complete code block: ",np.round( interval,2),"ms---|\n")
-        return p_k,timings
-
-      # Function mapping v to P(A+E)Pv
-      def _preconditioned_map(self, vector):
-        vector = self._apply_P( vector ) 
-        vector = np.dot( self.m, vector)  
-        vector = self._apply_P( vector ) 
-        return vector
+        return p_k, timings
       
-      def _apply_P(self, vector):
-
-        vector = vector - (self.eigscalar_vec*np.dot(self.y ,vector)).sum(axis=1)
-        vector = vector*self.diag_part
-        return vector    
-
-
-      def _iterative_precondition(self,x,y):
-        eig_vec_scalar = np.dot(np.vstack(self.precond_vectors),y)
-        eig_vec_scalar = eig_vec_scalar.reshape(eig_vec_scalar.shape[0],)
-        z = x*eig_vec_scalar[None,:]
-        z = np.sum(z,axis=1)[:,None]
-        y = y-z
-        return y
-
-      def _update(self,tol=1e-11, maxiter=100, iterative_inversion=-1, version=1, debug=False,optType='cg'):
+      def _update(self,tol=1e-11, maxiter=100, iterative_inversion=-1, version=1, debug=False, optType='cg'):
         
         i = 0
         while True :
@@ -632,15 +627,20 @@ class DampedNewton_With_Preconditioner:
             # Inverting Hessian against gradient with preconditioning
             if version == 4:
               print("\n At iteration: ",i)
-              p_k,temp = self._precond_inversion_v4( result, gradient, iterative_inversion=iterative_inversion, debug=debug )
+              p_k, temp = self._precond_inversion_v4( result, 
+                                                      gradient, 
+                                                      iterative_inversion=iterative_inversion, 
+                                                      debug = debug, 
+                                                      optType = optType )
               self.timing.append(temp)
            
             elif version == 3:
               print("\n At iteration: ",i)
-              if optType == 'cg':
-                p_k,temp = self._precond_inversion_v3( result, gradient, iterative_inversion=iterative_inversion, debug = debug ,optType = 'cg' )
-              else:
-                p_k,temp = self._precond_inversion_v3( result, gradient, iterative_inversion=iterative_inversion, debug = debug ,optType = 'gmres' )
+              p_k, temp = self._precond_inversion_v3( result, 
+                                                      gradient, 
+                                                      iterative_inversion=iterative_inversion, 
+                                                      debug = debug, 
+                                                      optType = optType )
               self.timing.append(temp)
 
             elif version == 2:
