@@ -1,19 +1,29 @@
 # computational-OT
 
+This package is work in progress in the context of Anirban BOSE's phD thesis.
+The goal is to study numerical methods for optimal transport.
+
 ## Content
 
 The repository is structured as follows. We only describe the most important files for a new user.
 ```bash
 ./
 |-- computational-OT: Core of package. 
+|  |-- _Cuthill_Mckee.py        : Use of (Reverse) Cuthill-Mckee to fleshout sparsity
+|  |-- Damped_Newton_precond.py : (Our method) Damped Newton with iterative inversion using preconditioning
+|  |-- Damped_Newton.py         : The classical damped Newton-Raphson algorithm with exact inversion of the Hessian
 |  |-- grad_ascent.py : Gradient ascent
 |  |-- L_BFGS_B.py    : BFGS is the goto quasi-Newton method
 |  |-- linear.py      : Linear programming using cvxpy
 |  |-- linesearch.py  : Gradient ascent with line search using Armijo condition
 |  |-- sinkhorn.py    : Sinkhorn iterations
 |-- ipynb: Contains Python notebooks which demonstrate how the code works
+|  |-- DampedNewton.ipynb: Illustration of the method (Self explanatory).
+|  |-- DampedNewtonPreconditioning.ipynb: Illustration of the method (Self explanatory).
 |  |-- Demo.ipynb: Illustrates the various methods, in particular, Sinkhorn, Gradient ascent (fixed or line search), L-BGFS, Newton...
 |  |-- Multiscale.ipynb: Exploring multiscale resolution
+|  |-- NewtonSparsity*.ipynb: Exploring sparsity as $\epsilon$ goes to zero
+|  |-- Sinkhorn.ipynb  : Benchmarking of Sinkhorn
 |-- tests: Unit tests
 |-- README.md: This file
 ```
