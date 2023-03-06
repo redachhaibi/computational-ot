@@ -27,12 +27,19 @@ class L_BFGS_B:
         return objective+regulariser
 
     
-    def _update(self, tol=1e-12, maxiter=1000,pgt=1e-20,maxl=100,factor=100000000.0):
+    def _update(self, tol = 1e-12,maxiter = 1000, maxf = 1,maxiter_lbgfs = 1,pgt = 1e-20,maxl = 10,factor = 100000000.0):
         
         i = 0
         while True :
     
-          out = sc.optimize.fmin_l_bfgs_b(self._objectivefunction, self.x,self._computegradient,maxfun=1, maxiter=1,pgtol=pgt,maxls=maxl,factr=factor)
+          out = sc.optimize.fmin_l_bfgs_b(  self._objectivefunction, 
+                                            self.x,
+                                            self._computegradient,
+                                            maxfun = maxf,
+                                            maxiter = maxiter_lbgfs,
+                                            pgtol = pgt,
+                                            maxls = maxl,
+                                            factr = factor )
 
           self.x = out[0]            
           
