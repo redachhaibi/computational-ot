@@ -21,6 +21,7 @@ class DampedNewton:
         self.objvalues = []
 
 
+
       def _computegradientf(self,f):
         """Computes Gradient with respect to f"""
         u = np.exp( f/self.epsilon )
@@ -55,8 +56,10 @@ class DampedNewton:
 
       
 
-      def _update(self,tol=1e-12, maxiter=100, debug=False):
-        
+      def _update(self,stabilization_noise = 0, tol=1e-12, maxiter=100, debug=False):
+        z = np.max(self.K)
+        self.K = np.exp(self.K-z)
+        self.K = np.log(self.K + stabilization_noise) + z
         i=0
         while True :
             
@@ -109,9 +112,20 @@ class DampedNewton:
               #print( "Null vector vs gradient :", np.dot(self.null_vector.flatten(), gradient.flatten()) )
               #print( "Null vector vs p_k      :", np.dot(self.null_vector.flatten(), p_k.flatten()) )
 
+            
+            
             # Inflating the corresponding direction
             mean_eig = -( 0.5*np.mean( r1 ) + 0.5*np.mean( r2 ) )/self.epsilon
             self.Hessian_stabilized = self.Hessian + mean_eig*self.reg_matrix
+            # eig, v = np.linalg.eigh(self.Hessian_stabilized)
+            # sorted_indices = np.argsort(eig)
+            # v = v[:,sorted_indices]
+            # print(len(np.where(eig < 1e-1000)[0]))
+            # k=len(np.where(eig < 1e-1000)[0])
+            # print("Condition number: ", np.max(eig)/np.min(eig))
+            # if self.epsilon <= 0.02:
+            #   for eigv in v[:k]:
+            #       self.Hessian_stabilized = self.Hessian_stabilized + mean_eig*np.dot(eigv[:, None] , eigv[:, None].T)
             
             # Debug
             # if debug:
@@ -126,21 +140,20 @@ class DampedNewton:
             #   self.reg_matrix = np.dot( empirical_null_vector, empirical_null_vector.T)
             #   #
             #   print( "--- Stabilized")
-            #   print( "List of --smallest eigenvalues: ", eig[:3])
+            #   print( "List of --smallest eigenvalues:mean_eig ", eig[:3])
             #   print( "Null vector vs empirical:", np.dot(self.null_vector.flatten(), empirical_null_vector.flatten()) )
             #   print( "")
               #print( "Null vector vs gradient :", np.dot(self.null_vector.flatten(), gradient.flatten()) )
               #print( "Null vector vs p_k      :", np.dot(self.null_vector.flatten(), p_k.flatten()) )
-
+            # eig,v = np.linalg.eigh(self.Hessian_stabilized)
             try:
-              p_k = -np.linalg.solve( self.Hessian_stabilized,gradient )
 
+              p_k = -np.linalg.solve( self.Hessian_stabilized,gradient )
             except:
               print( "Inverse does not exist at epsilon:",self.epsilon )
               return np.zeros( 6 )
 
             p_k = p_k - self.null_vector*np.dot( self.null_vector.flatten(), p_k.flatten() )
-
             # 
             # if debug:
             #   cos_metric = np.dot( p_k.flatten(), gradient.flatten())/( np.linalg.norm(p_k)*np.linalg.norm(gradient) )
