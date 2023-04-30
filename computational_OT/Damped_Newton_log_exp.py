@@ -56,9 +56,20 @@ class DampedNewtonLogexp:
         
 
         def _update(self,stabilization_noise = 0, tol=1e-12, maxiter=100, debug=False):
-          z = np.max(self.K)
-          self.K = np.exp(self.K-z)
-          self.K = np.log(self.K + stabilization_noise) + z
+          print("Condition numner without noise: ",np.linalg.cond(self.K)," Condition number with noise: ",np.linalg.cond(self.K+stabilization_noise))
+          ### Stabilization 1:
+          self.K += stabilization_noise
+          ### Stabilization 2:
+            # z = np.amax(self.K,axis = 1)
+            # self.K = np.exp(self.K-z[:,None])
+            # self.K = np.log(self.K ) + z[:,None] 
+            # self.K = np.exp(self.K-z[:,None])
+            # self.K = np.log(self.K ) + z[:,None] + stabilization_noise
+          ### Stabilization 3:
+            # z = np.amax(self.K,axis = 1)
+            # self.K = np.exp(self.K-z[:,None])
+            # self.K = np.log(self.K + stabilization_noise) + z[:,None] 
+        
           i=0
           while True :
               
