@@ -46,6 +46,7 @@ class Sinkhorn:
       if iter_condition and i<maxiter :
           i += 1
       else:
+        print("Terminating after iteration: ",i+1)
         break   
 
     # end for
