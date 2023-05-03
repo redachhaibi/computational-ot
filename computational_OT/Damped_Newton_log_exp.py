@@ -55,22 +55,24 @@ class DampedNewtonLogexp:
 
         
 
-        def _update(self,stabilization_noise = 0, tol=1e-12, maxiter=100, debug=False):
-          print("Condition numner without noise: ",np.linalg.cond(self.K)," Condition number with noise: ",np.linalg.cond(self.K+stabilization_noise))
+        def _update(self,stabilize = 0,stabilization_noise = 0, tol=1e-12, maxiter=100, debug=False):
+          
           ### Stabilization 1:
-          self.K += stabilization_noise
+            # self.K += stabilization_noise
           ### Stabilization 2:
             # z = np.amax(self.K,axis = 1)
-            # self.K = np.exp(self.K-z[:,None])
-            # self.K = np.log(self.K ) + z[:,None] 
             # self.K = np.exp(self.K-z[:,None])
             # self.K = np.log(self.K ) + z[:,None] + stabilization_noise
           ### Stabilization 3:
             # z = np.amax(self.K,axis = 1)
             # self.K = np.exp(self.K-z[:,None])
             # self.K = np.log(self.K + stabilization_noise) + z[:,None] 
-        
-          i=0
+          if stabilize == 1:
+          ### Stabilization 4:
+            z = np.amax(np.log(self.K),axis = 1)
+            self.K = np.log(self.K)
+            self.K = np.exp(self.K-z[:,None])*np.exp(z[:,None]) +stabilization_noise
+          i = 0
           while True :
               
               grad_f = self._computegradientf( self.x[:self.a.shape[0]] )
@@ -94,6 +96,11 @@ class DampedNewtonLogexp:
               C = P.T
               D = np.diag( np.array( r2.reshape( r2.shape[0], ) ) )
               result = np.vstack( ( np.hstack( ( A,B ) ), np.hstack( ( C,D ) ) ) )
+              result = result 
+              # ## Stabilization 5:
+              # z = np.amax(np.log(result),axis = 1)
+              # result = np.log(result)
+              # result = np.exp(result-z[:,None])*np.exp(z[:,None]) +stabilization_noise
 
               self.Hessian = -result/self.epsilon
 
