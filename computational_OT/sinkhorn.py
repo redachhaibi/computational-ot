@@ -53,7 +53,7 @@ class Sinkhorn:
     return {
       'potential_f' : self.epsilon*np.log(self.u).reshape(self.a.shape[0],-1),
       'potential_g' : self.epsilon*np.log(self.v).reshape(self.b.shape[0],-1),
-      'error_a' : self.err_a,
-      'error_b' : self.err_b,
-      'objectives' : self.obj
+      'error_a'     : self.err_a,
+      'error_b'     : self.err_b,
+      'objectives'  : self.obj
     }
