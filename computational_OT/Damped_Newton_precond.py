@@ -731,11 +731,7 @@ class DampedNewton_With_Preconditioner:
         return p_k, timings
       
 
-      def _update(self,stabilization_noise=0, tol = 1e-11, maxiter = 100, iterative_inversion = -1, version = 1, debug = False, optType = 'cg'):
-        z = np.max(self.K)
-        self.K = np.exp(self.K-z)
-        self.K = np.log(self.K + stabilization_noise) + z
-        print(self.K.shape)
+      def _update(self, tol = 1e-11, maxiter = 100, iterative_inversion = -1, version = 1, debug = False, optType = 'cg'):
         i = 0
         while True :    
             
