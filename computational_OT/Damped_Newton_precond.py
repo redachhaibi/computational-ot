@@ -665,7 +665,7 @@ class DampedNewton_With_Preconditioner:
         interval = 1e3*(end-start0)
         timings.append( interval )
 
-        # Changing A=matrix to PAP]
+        # Changing the A matrix to PAP
         start2 = time.time()
 
         # Function mapping v to Pv
@@ -784,8 +784,8 @@ class DampedNewton_With_Preconditioner:
             elif version == 2:
               print("\n At iteration: ",i)
               p_k,temp  = self._precond_inversion_v2( result, 
-                                                     gradient, 
-                                                     iterative_inversion=iterative_inversion, 
+                                                      gradient, 
+                                                      iterative_inversion=iterative_inversion, 
                                                       debug=debug )
               self.timing.append(temp)
             elif version == 1:
