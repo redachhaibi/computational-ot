@@ -858,13 +858,13 @@ class DampedNewton_With_Preconditioner:
                 break
 
         return {
-          "potential_f": self.x[:self.a.shape[0]],
-          "potential_g": self.x[self.a.shape[0]:],
-          "error_a"    : self.err_a,
-          "error_b"    : self.err_b,
-          "objectives" : self.objvalues,
+          "potential_f"      : self.x[:self.a.shape[0]].reshape(self.a.shape[0],),
+          "potential_g"      : self.x[self.a.shape[0]:].reshape(self.b.shape[0],),
+          "error_a"          : self.err_a,
+          "error_b"          : self.err_b,
+          "objectives"       : self.objvalues,
           "linesearch_steps" : self.alpha,
-          "timings"    : self.timing  
+          "timings"          : self.timing  
         }
 
  # end for    

@@ -56,10 +56,7 @@ class DampedNewton:
 
       
 
-      def _update(self,stabilization_noise = 0, tol=1e-12, maxiter=100, debug=False):
-        z = np.max(self.K)
-        self.K = np.exp(self.K-z)
-        self.K = np.log(self.K + stabilization_noise) + z
+      def _update(self, tol=1e-12, maxiter=100, debug=False):
         i=0
         while True :
             
@@ -193,11 +190,11 @@ class DampedNewton:
       
         # end for
         return {
-          "potential_f" : self.x[:self.a.shape[0]],
-          "potential_g" : self.x[self.a.shape[0]:],
-          "error_a"     : self.err_a,
-          "error_b"     : self.err_b,
-          "objectives"  : self.objvalues,
+          "potential_f"      : self.x[:self.a.shape[0]].reshape(self.a.shape[0],),
+          "potential_g"      : self.x[self.a.shape[0]:].reshape(self.b.shape[0],),
+          "error_a"          : self.err_a,
+          "error_b"          : self.err_b,
+          "objectives"       : self.objvalues,
           "linesearch_steps" : self.alpha       
         }    
         
