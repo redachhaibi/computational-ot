@@ -9,4 +9,4 @@ from ._Cuthill_Mckee import _Expcuthill_mckee
 from .NestedDissection import *
 from .Damped_Newton import *
 from .Damped_Newton_precond import *
-
+from .logdomain_sinkhorn import *
