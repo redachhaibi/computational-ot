@@ -47,7 +47,7 @@ class DampedNewton:
           reduction_count = 0
           while True:
             condition = self._objectivefunction( self.x+alpha*p )<self._objectivefunction( self.x )+self.c*alpha*slope
-            if condition:
+            if condition or np.isnan(self._objectivefunction(self.x+alpha*p)):
               alpha = self.rho*alpha
               reduction_count += 1
             else:

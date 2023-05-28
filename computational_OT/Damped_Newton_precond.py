@@ -40,18 +40,6 @@ class DampedNewton_With_Preconditioner:
         f = x[:self.a.shape[0]]
         g = x[self.a.shape[0]:]
         regularizer = -self.epsilon*np.dot(np.exp(f/self.epsilon).T,np.dot(self.K,np.exp(g/self.epsilon)))
-        # sum_f = (f*self.a)
-        # sum_g = (g*self.b)
-        # m_f = max(np.log(sum_f))
-        # m_g = max(np.log(sum_g))
-        # sum_f = np.log(np.sum(np.exp(np.log(sum_f)-m_f))) + m_f
-        # sum_g = np.log(np.sum(np.exp(np.log(sum_g)-m_g))) + m_g
-        # s=np.exp(f/self.epsilon)*self.K*np.exp(g/self.epsilon).T
-        # print(s.shape)
-        # print(s.max())
-        # m = max(s)
-        # regularizer = -self.epsilon*(np.log(np.sum(np.sum(s*pow(m,-1),axis=0),axis=1))-np.log(m))
-        # return sum_f + sum_g + regularizer
         return np.dot(f.T,self.a) +  np.dot(g.T,self.b) + regularizer
 
 
@@ -60,8 +48,8 @@ class DampedNewton_With_Preconditioner:
           
           reduction_count = 0
           while True:
-            condition = self._objectivefunction(self.x+alpha*p)<self._objectivefunction(self.x)+self.c*alpha*slope
-            if condition:
+            condition = self._objectivefunction(self.x+alpha*p)<self._objectivefunction(self.x)+self.c*alpha*slope 
+            if condition or np.isnan(self._objectivefunction(self.x+alpha*p)):
               alpha = self.rho*alpha
               reduction_count += 1
             else:
@@ -163,7 +151,7 @@ class DampedNewton_With_Preconditioner:
         timings.append( interval )
         print( "|--- Time taken for unwinding: ",np.round( interval,5),"ms---|" )
         interval = 1e3*( end-start )
-        timings.append( interval )
+        timings.append( interval )    
 
         print( "|--- Time taken for the complete code block: ",np.round( interval,2),"ms---|\n" )
         return p_k,timings
@@ -205,7 +193,7 @@ class DampedNewton_With_Preconditioner:
           vector = self.precond_vectors[i]
           value  = np.dot( np.dot( matrix, vector ), vector )
           vector = vector.reshape( (vector.shape[0], 1) )
-          P_matrix = P_matrix+ ( 1/np.sqrt( value )-1 )*np.dot( vector, vector.T )
+          P_matrix = P_matrix + ( 1/np.sqrt( value )-1 )*np.dot( vector, vector.T )
         # end for
         unwinding_transformations.append( [P_matrix, lambda P,x : np.dot(P, x)] )
         
@@ -230,6 +218,7 @@ class DampedNewton_With_Preconditioner:
         interval = 1e3*(end-start2)
         timings.append( interval )
 
+
         print( "|--- Time taken for the debug step: ", np.round( interval,5 ),"ms---|" )
 
         start3 = time.time()
@@ -252,7 +241,7 @@ class DampedNewton_With_Preconditioner:
         print( "|--- Time taken to invert the linear system for p_k: ",np.round( interval,5 ),"ms---|")
 
         start4 = time.time()
-        # Unwind
+         # Unwind
         for transform in unwinding_transformations:
           P,f = transform
           p_k = f(P,p_k)
@@ -620,13 +609,24 @@ class DampedNewton_With_Preconditioner:
         # Record list of unwinding transformations on final result
         unwinding_transformations = []
 
+        # eigs, _ = np.linalg.eigh(unnormalized_Hessian)
+        # print("Condition number(max/min): ",eigs[-1]/eigs[0]," Smallest eigenvalues: ",eigs[0],"Largest Eigenvalue: ",eigs[-1])
+
         # Construct modified Hessian
         diag = 1/np.sqrt( np.diag(unnormalized_Hessian).flatten() )
         self.modified_Hessian = diag[:,None]*unnormalized_Hessian*diag[None,:]
-        
+        # eigs, _ = np.linalg.eigh(self.modified_Hessian)
+        # count = 0
+        # for i in eigs:
+        #   if i<0:
+        #     count +=1
+        # print("Number of negative eigenvalues: ",count)
+        # print("")
+        # print("Condition number(max/min): ",eigs[-1]/eigs[0]," Smallest eigenvalues: ",eigs[0],"Largest Eigenvalue: ",eigs[-1])
+
         # Dummy variable to work on
         matrix = self.modified_Hessian
-
+       
 
         # Preconditioning along null vector
         vector = self.null_vector
@@ -649,8 +649,7 @@ class DampedNewton_With_Preconditioner:
         #  matrix = our matrix A to precondition
         #  We only form the data y and z such that
         #  P = id + z*y.T
-        
-        k = len( self.precond_vectors )
+        k = len( self.precond_vectors ) 
         n = self.null_vector.shape[0]
         start0 = time.time()
         y = np.array( self.precond_vectors ).T # Matrix of size n by k
@@ -672,17 +671,40 @@ class DampedNewton_With_Preconditioner:
         # P = Id + z*y.T
         def _apply_P(vector):
           return vector + z @ ( y.T @ vector)
-        
 
         # Function mapping v to P(A+E)Pv
         # A is matrix
         # E is vector_E*vector_E.T
         def _preconditioned_map(vector):
-          # print(np.linalg.norm(vector))
-          vector = _apply_P( vector ) 
-          vector = np.dot(matrix,vector)  + vector_E*np.dot(vector_E, vector)
-          vector = _apply_P( vector ) 
-          # print(np.linalg.norm(vector))
+          vector   = _apply_P( vector ) 
+          # vector_x = vector[:self.a.shape[0]]
+          # vector_y = vector[self.a.shape[0]:]
+          # I_n      = matrix[:self.a.shape[0],:self.a.shape[0]]
+          # P        = matrix[:self.a.shape[0],self.a.shape[0]:] 
+          # P_T      = matrix[self.a.shape[0]:,:self.a.shape[0]]
+          # I_m      = matrix[self.a.shape[0]:,self.a.shape[0]:]
+          # #In x and I_my
+          # I_nx     = np.dot(I_n,vector_x)
+          # I_my     = np.dot(I_m,vector_y)
+          # #Py
+          # # print(Py.shape)
+          # Py       = P*np.exp(np.log(abs(vector_y)))[None,:]
+          # minPy    = np.min(self.epsilon*np.log((diag[:,None][:self.a.shape[0],:]*Py*diag[None,:][:,self.a.shape[0]:])),axis = 1)
+          # Py       = Py*np.exp(minPy[:,None]/self.epsilon)
+          # Py       = Py*np.sign(vector_y)[None,:]
+          # # print(np.exp(-minPy[None:]/self.epsilon).shape)
+          # Py       = np.sum(Py, axis = 1)[:,None]*np.exp(-minPy[:,None]/self.epsilon)
+          # #P_Tx
+          # Px       = P_T*np.exp(np.log(abs(vector_x)))[None,:]
+          # minPx    = np.min(self.epsilon*np.log((diag[:,None][self.a.shape[0]:,:]*Px*diag[None,:][:,:self.a.shape[0]])),axis = 1) 
+          # Px       = Px*np.exp(minPx[:,None]/self.epsilon)
+          # Px       = Px*np.sign(vector_x)[None,:]
+          # # print(np.exp(-minPx[:,None]/self.epsilon).shape)
+          # Px       = np.sum(Px, axis = 1)[:,None]*(np.exp(-minPx[:,None]/self.epsilon))
+          # matrixvec_mult  = np.hstack((I_nx+Py.squeeze(),I_my+Px.squeeze()))
+          vector   = np.dot(matrix,vector)  + vector_E*np.dot(vector_E, vector)
+          # vector   = matrixvec_mult  + vector_E*np.dot(vector_E, vector)
+          vector   = _apply_P( vector ) 
           return vector
         
         
@@ -691,19 +713,24 @@ class DampedNewton_With_Preconditioner:
         # At the end 
         gradient = _apply_P(gradient)
         unwinding_transformations.append( lambda x : _apply_P(x) )
-        end=time.time()
+        end      = time.time()
         interval = 1e3*(end-start2)
         timings.append( interval )  
-
         #
         # Solve either iteratively using CG or exactly
         start3 = time.time()
 
         self.Hessian_stabilized = -matrix/self.epsilon
-
         if iterative_inversion >= 0:
-          self.m = matrix
-          
+          self.m  = matrix
+          # eigs, _ = np.linalg.eigh(matrix)
+          # count   = 0
+          # for i in eigs:
+          #   if i<0:
+          #     count +=1
+          # print("Number of negative eigenvalues: ",count)
+          # print("")
+          # print("Condition number(max/min): ",eigs[-1]/eigs[0]," Smallest eigenvalues: ",eigs[0],"Largest Eigenvalue: ",eigs[-1])
           A = scipy.sparse.linalg.LinearOperator( ( self.m.shape[0],self.m.shape[1] ), matvec=_preconditioned_map ) 
           if optType == 'cg':
             inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0 = gradient, maxiter = iterative_inversion, tol=1e-10 )
@@ -734,7 +761,6 @@ class DampedNewton_With_Preconditioner:
       def _update(self, tol = 1e-11, maxiter = 100, iterative_inversion = -1, version = 1, debug = False, optType = 'cg'):
         i = 0
         while True :    
-            
             grad_f = self._computegradientf(self.x[:self.a.shape[0]])
             grad_g = self._computegradientg(self.x[self.a.shape[0]:])
             gradient = np.vstack((grad_f,grad_g))
@@ -744,21 +770,16 @@ class DampedNewton_With_Preconditioner:
             v = np.exp(self.x[self.a.shape[0]:]/self.epsilon)
             r1 = u*np.dot(self.K,v) 
             r2 = v*np.dot(self.K.T,u)
-            # a = np.amax(np.log(self.K), axis=1)
-            # r1 = u*(np.exp(a[:,None])*np.dot(np.exp(np.log(self.K)-a[:,None]),((v*np.exp(np.log(np.linalg.norm(v))))/np.linalg.norm(v))))
-            # a = np.amax(np.log(self.K.T), axis=1)
-            # r2 = v*(np.exp(a[:,None])*np.dot(np.exp(np.log(self.K.T)-a[:,None]),(u*np.exp(np.log(np.linalg.norm(u))))/np.linalg.norm(u)))
-            # P  = u*self.K*(v.T) # WRONG AGAIN: DANGEROUS CODE!!
             u = u.reshape(u.shape[0],)
             v = v.reshape(v.shape[0],)
-            a = np.amax(np.log(self.K), axis=1) 
-            # P = u[:,None]*self.K*v[None,:]
-            P = (u[:,None]*(np.exp(np.log(self.K)-a[:,None]))*v[None,:])*np.exp(a[:,None])
+            P = u[:,None]*self.K*v[None,:]
             A = np.diag( np.array(r1.reshape(r1.shape[0],)) )
             B = P
             C = P.T
             D = np.diag( np.array(r2.reshape(r2.shape[0],)) )
             result = np.vstack( ( np.hstack((A,B)), np.hstack((C,D)) ) )
+                          
+          #  print(np.linalg.cond(result))
             # a = np.max(result)
             # result = np.exp(result-a)
             # result = np.log(result+1e-8) + a -np.log(1+1e-8)
@@ -838,7 +859,7 @@ class DampedNewton_With_Preconditioner:
             self.alpha.append( alpha )
             # Update x = f and g
             self.x = self.x + alpha*p_k_stacked
-          
+            # print("Norm of (f,g) after update: ",np.linalg.norm(self.x))
             # error computation 1
             s = np.exp(self.x[:self.a.shape[0]]/self.epsilon)*np.dot(self.K,np.exp(self.x[self.a.shape[0]:]/self.epsilon))
             self.err_a.append(np.linalg.norm(s - self.a))
