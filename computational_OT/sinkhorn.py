@@ -34,7 +34,7 @@ class Sinkhorn:
       # error computation 1
       r = self.v*np.dot( self.K.T, self.u)
       self.err_b.append(Lin.norm(r - self.b))
-
+      
       # sinkhorn step 2
       self.v = self.b / np.dot( self.K.T, self.u )
       
@@ -46,7 +46,7 @@ class Sinkhorn:
       if iter_condition and i<maxiter :
           i += 1
       else:
-        print("Terminating after iteration: ",i+1)
+        print("Terminating after iteration: ",i)
         break   
 
     # end for

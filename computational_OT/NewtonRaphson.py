@@ -104,7 +104,8 @@ class NewtonRaphson:
             if iter_condition and i < maxiter:
                 i += 1
             else:
-                break
+                print("Terminating after iteration: ",i)
+                break 
         return {
             'error_a' : self.err_a,
             'error_b' : self.err_b,

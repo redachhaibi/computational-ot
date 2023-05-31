@@ -144,7 +144,6 @@ class DampedNewton:
               #print( "Null vector vs p_k      :", np.dot(self.null_vector.flatten(), p_k.flatten()) )
             # eig,v = np.linalg.eigh(self.Hessian_stabilized)
             try:
-
               p_k = -np.linalg.solve( self.Hessian_stabilized,gradient )
             except:
               print( "Inverse does not exist at epsilon:",self.epsilon )
@@ -185,7 +184,7 @@ class DampedNewton:
             if i<maxiter and ( self.err_a[-1]>tol or self.err_b[-1]>tol ) :
                  i += 1
             else:
-                print("Terminating after iteration: ",i+1)
+                print("Terminating after iteration: ",i)
                 break
       
         # end for

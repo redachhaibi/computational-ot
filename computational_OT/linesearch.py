@@ -97,7 +97,8 @@ class LineSearch:
             if i < maxiter and (self.err_a[-1]>tol or self.err_b[-1]>tol) :
                  i += 1
             else:
-                break
+              print("Terminating after iteration: ",i)
+              break 
       
         # end for    
         return {

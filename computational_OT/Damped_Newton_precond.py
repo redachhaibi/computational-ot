@@ -831,7 +831,7 @@ class DampedNewton_With_Preconditioner:
             if i < maxiter and ( self.err_a[-1] > tol or self.err_b[-1] > tol ) :
                  i += 1
             else:
-                print( "Terminating after iteration: ",i+1 )
+                print( "Terminating after iteration: ",i )
                 break
 
         return {
