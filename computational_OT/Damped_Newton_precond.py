@@ -296,7 +296,7 @@ class DampedNewton_With_Preconditioner:
         Ay = np.dot( matrix, y )
         eigenvalues = np.sum( y * Ay, axis=0 )
         # Compute P_matrix = id + y*diag(values)*y.T
-        values = ( 1/np.sqrt(eigenvalues)-1 )    # Vector of size k
+        values = ( (1/np.sqrt(eigenvalues))-1 )    # Vector of size k
         z = y*values[None,:]
         P_matrix = np.identity( n ) + np.dot( z, y.T )
         # Old version
