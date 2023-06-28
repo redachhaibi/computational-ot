@@ -9,19 +9,21 @@ class Log_domainSinkhorn:
         self.epsilon = epsilon
         self.error   = []
     
-    # def mina_u(self,H):
-    #     return -self.epsilon*np.log( np.sum(self.a[:,None] * np.exp(-H/self.epsilon),0) )
-    
-    # def minb_u(self,H):
-    #     return -self.epsilon*np.log( np.sum(self.b[None,:] * np.exp(-H/self.epsilon),1) )  
-   
     def mina_u(self,H):
-        epsilon = self.epsilon
-        return -self.epsilon*np.log( np.sum(self.a[:,None] * ne.evaluate('-H/epsilon'),0) )
+        return -self.epsilon*np.log( np.sum(self.a[:,None] * np.exp(-H/self.epsilon),0) )
     
     def minb_u(self,H):
-        epsilon = self.epsilon
-        return -self.epsilon*np.log( np.sum(self.b[None,:] * ne.evaluate('-H/epsilon'),1) )  
+        return -self.epsilon*np.log( np.sum(self.b[None,:] * np.exp(-H/self.epsilon),1) )  
+   
+    # def mina_u(self,H):
+    #     epsilon = self.epsilon
+    #     matrix = -H/epsilon
+    #     return -self.epsilon*np.log( np.sum(self.a[:,None] * ne.evaluate('exp(matrix)'),0) )
+    
+    # def minb_u(self,H):
+    #     epsilon = self.epsilon
+    #     matrix = -H/epsilon
+    #     return -self.epsilon*np.log( np.sum(self.b[None,:] * ne.evaluate('exp(matrix)'),1) )  
     
     def mina(self,H):
         return self.mina_u(H-np.min(H,0)) + np.min(H,0)
