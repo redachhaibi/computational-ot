@@ -40,8 +40,11 @@ class Log_domainSinkhorn:
             # check conservation of mass
             self.error.append( np.linalg.norm(np.sum(P,0)-self.b,1) )
             if self.error[i] < tol:
-                print("Terminating after iteration: ",i)
+                print("Terminating after iteration: ", i)
                 break
+        #end for
+        if i + 1 >= niter:
+            print("Terminating after maximal number of iterations: ", niter)
         return {
             'error'      : self.error,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
             'potential_f': f+self.epsilon*np.log(self.a).reshape(self.a.shape[0],),
