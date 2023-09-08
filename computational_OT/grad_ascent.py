@@ -36,7 +36,7 @@ class Gradient_Ascent:
       s = np.exp(self.f/self.epsilon)*np.dot(self.K,np.exp(self.g/self.epsilon))
       self.err_a.append(Lin.norm(s - self.a))
       # Update g
-      self.g = self.g+self.learning_rate*grad_f 
+      self.g = self.g+self.learning_rate*grad_g
       # error computation 2
       r = np.exp(self.g/self.epsilon)*np.dot(self.K .T, np.exp(self.f/self.epsilon))
       self.err_b.append(Lin.norm(r - self.b))
