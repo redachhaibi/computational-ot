@@ -1,5 +1,4 @@
 import numpy as np
-from numpy import linalg as Lin
 
 
 class Gradient_Ascent:
@@ -34,20 +33,20 @@ class Gradient_Ascent:
       self.f = self.f+self.learning_rate*grad_f
       # error computation 1
       s = np.exp(self.f/self.epsilon)*np.dot(self.K,np.exp(self.g/self.epsilon))
-      self.err_a.append(Lin.norm(s - self.a))
+      self.err_a.append(np.linalg.norm(s - self.a))
       # Update g
       self.g = self.g+self.learning_rate*grad_g
       # error computation 2
       r = np.exp(self.g/self.epsilon)*np.dot(self.K .T, np.exp(self.f/self.epsilon))
-      self.err_b.append(Lin.norm(r - self.b))
+      self.err_b.append(np.linalg.norm(r - self.b))
       self.obj.append(self._objectivefunction())
 
-      if i<maxiter and ( self.err_a[-1]>tol or self.err_b[-1]>tol ) :
+      iter_condition = (self.err_a[-1]>tol or self.err_b[-1]>tol)
+      if iter_condition and i<maxiter :
           i += 1
-      
       else:
         print("Terminating after iteration: ",i)
-        break 
+        break  
     # end for
     # return self.f,self.g, self.err_a,self.err_b,self.obj
     return {
