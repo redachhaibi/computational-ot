@@ -10,3 +10,4 @@ from .NestedDissection import *
 from .Damped_Newton import *
 from .Damped_Newton_precond import *
 from .logdomain_sinkhorn import *
+from .torchlogdomain_sinkhorn import *
