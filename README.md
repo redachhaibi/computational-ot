@@ -71,7 +71,7 @@ python -m ipykernel install --user --name=.venv_computational-OT
 
 7. (Not needed if step 5 is used) Packages
 ```bash
-pip install numpy matplotlib scipy sympy cvxpy
+pip install numpy matplotlib scipy sympy cvxpy torch
 ```
 
 ## Configuration
