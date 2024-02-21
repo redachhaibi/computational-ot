@@ -723,7 +723,8 @@ class DampedNewton_With_Preconditioner:
 
       def _update(self, tol = 1e-11, maxiter = 100, iterative_inversion = -1, version = 1, debug = False, optType = 'cg'):
         i = 0
-        while True :    
+        while True :
+            # Compute gradient    
             grad_f = self._computegradientf(self.x[:self.a.shape[0]])
             grad_g = self._computegradientg(self.x[self.a.shape[0]:])
             gradient = np.vstack((grad_f,grad_g))
