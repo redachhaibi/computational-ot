@@ -1,6 +1,4 @@
 import numpy as np
-from numpy import linalg as Lin
-
 
 class Sinkhorn:
 
@@ -33,18 +31,20 @@ class Sinkhorn:
       self.u = self.a / np.dot( self.K, self.v )
       # error computation 1
       r = self.v*np.dot( self.K.T, self.u)
-      self.err_b.append(Lin.norm(r - self.b))
+      self.err_b.append(np.linalg.norm(r - self.b))
       
       # sinkhorn step 2
       self.v = self.b / np.dot( self.K.T, self.u )
       
       # error computation 2
       s = self.u*np.dot( self.K, self.v )
-      self.err_a.append(Lin.norm(s - self.a))
-
+      self.err_a.append(np.linalg.norm(s - self.a))
       iter_condition = (self.err_a[-1]>tol or self.err_b[-1]>tol)
       if iter_condition and i<maxiter :
           i += 1
+      elif np.isnan(self.err_a[-1]) or np.isnan(self.err_b[-1]):
+        print("Sinkhorn is unstable for epsilon: ", self.epsilon, " as there occurs divison by exponentially small values while performing the alternative projection. ")
+        break
       else:
         print("Terminating after iteration: ",i)
         break   
