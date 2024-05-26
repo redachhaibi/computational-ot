@@ -12,5 +12,7 @@ from .Damped_Newton_precond import *
 from .logdomain_sinkhorn import *
 from .torchlogdomain_sinkhorn import *
 from .logdomain_sinkhorn_JAX import *
-#from .Semi_dual_JAX import *
-#from .Damped_Newton_JAX import *
+from .Damped_Newton_SemiDual_numpy import *
+from .Damped_Newton_SemiDual_JAX import *
+from .Damped_Newton_precond_SemiDaul_numpy import *
+from .Damped_Newton_precond_SemiDual_JAX import *
