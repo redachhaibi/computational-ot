@@ -1,5 +1,6 @@
 import numpy as np
 import scipy
+import logging
 import time
 
 class DampedNewton_With_Preconditioner:
@@ -720,7 +721,7 @@ class DampedNewton_With_Preconditioner:
         return p_k, timings
       
 
-      def _update(self, tol = 1e-12, maxiter = 100, iterative_inversion = -1, version = 1, debug = False, optType = 'cg'):
+      def _update(self, tol = 1e-11, maxiter = 100, iterative_inversion = -1, version = 1, debug = False, optType = 'cg'):
         i = 0
         while True :
             # Compute gradient    
@@ -813,7 +814,6 @@ class DampedNewton_With_Preconditioner:
             alpha = self._wolfe1( alpha, p_k_stacked, slope)
             end = time.time()
             self.alpha.append( alpha )
-            start = time.time()
             # Update x = f and g
             self.x = self.x + alpha*p_k_stacked
             # print("Norm of (f,g) after update: ",np.linalg.norm(self.x))
@@ -824,8 +824,7 @@ class DampedNewton_With_Preconditioner:
             # error computation 2
             r = np.exp(self.x[self.a.shape[0]:]/self.epsilon)*np.dot(self.K .T, np.exp(self.x[:self.a.shape[0]]/self.epsilon))
             self.err_b.append(np.linalg.norm(r - self.b))
-            end = time.time()
-            print( 1e3*(end-start))
+
             # Calculating Objective values
             value = self._objectivefunction( self.x )
             self.objvalues.append(value[0])
