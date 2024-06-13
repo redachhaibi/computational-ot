@@ -1,8 +1,8 @@
 import numpy as np
 
 class DampedNewton_SemiDual_np:
-    def __init__(self, K, a, b, f, epsilon, rho, c):
-        self.K = K
+    def __init__(self, C, a, b, f, epsilon, rho, c):
+        self.C = C
         self.a = a
         self.b = b
         self.f = f
@@ -15,21 +15,19 @@ class DampedNewton_SemiDual_np:
         null_vector = np.hstack(np.ones(self.a.shape[0]))/np.sqrt(self.a.shape[0])
         self.null_vector = np.reshape(null_vector, (self.a.shape[0],1))
         self.reg_matrix = np.dot( self.null_vector, self.null_vector.T )
-
-    def _log_regularise(self,min,a,u):
-        return np.log(np.sum(a[:,None]*u[:,None]*self.K*np.exp(min/self.epsilon)[None,:],0))
     
     def _objectivefunction(self,x):
         a_ = self.a.reshape(self.a.shape[0],)
-        u = np.exp(x/self.epsilon).reshape(x.shape[0],)
-        min_x = np.min(-self.epsilon*np.log(self.K)-x,0)
-        y = -self.epsilon*self._log_regularise(min_x,a_,u)+min_x[None,:]
-        return np.dot(x.T, self.a) + np.dot(y, self.b)   
+        min_x = np.min(self.C-x,0)
+        x = x.reshape(self.a.shape[0],)
+        y = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((x[:,None]-self.C+min_x[None,:])/self.epsilon),0))+min_x[None,:]
+        return np.dot(x.T, self.a) + np.dot(y, self.b) 
      
     def _computegradientf(self):
         a_ = self.a.reshape(self.a.shape[0],)
         b_ = self.b.reshape(self.b.shape[0],)
-        gradient = self.a-np.sum(a_[:,None]*self.u[:,None]*self.K*self.v[None,:]*b_[None,:]*np.exp(self.min_f/self.epsilon)[None,:], 1).reshape(self.a.shape[0],-1)
+        f_ = self.f.reshape(self.a.shape[0],)
+        gradient = self.a-np.sum(a_[:,None]*np.exp((f_[:,None]+self.g[None,:]-self.C+self.min_f[None,:])/self.epsilon)*b_[None,:], 1).reshape(self.a.shape[0],-1)
         return gradient
     
     def _wolfe1(self,alpha,p,slope):#Armijo Condition
@@ -47,20 +45,19 @@ class DampedNewton_SemiDual_np:
     def _update(self, tol=1e-12, maxiter = 100, debug = False):
         a_ = self.a.reshape(self.a.shape[0],)
         b_ = self.b.reshape(self.b.shape[0],)
-        self.min_f = np.min(-self.epsilon*np.log(self.K)-self.f,0)
-        self.u = np.exp(self.f/self.epsilon).reshape(self.f.shape[0],)
-        self.g = -self.epsilon*self._log_regularise(self.min_f,a_,self.u)
-        self.v = np.exp(self.g/self.epsilon).reshape(self.g.shape[0],)
+        self.min_f = np.min(self.C-self.f,0)
+        f_ = self.f.reshape(self.a.shape[0],)
+        self.g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((f_[:,None]-self.C+self.min_f[None,:])/self.epsilon),0))
         i = 0
         while True: 
             # Compute gradient w.r.t f:
             grad_f = self._computegradientf()
             # Compute the Hessian:
-            M = a_[:,None]*self.u[:,None]*self.K*self.v[None,:]*np.sqrt(b_)[None,:]*np.exp(self.min_f/self.epsilon)[None,:]
-            self.Hessian = np.sum(M*np.sqrt(b_)[None,:],1)[:,None]*np.identity(self.a.shape[0])-np.dot( M , M.T ) 
-            mean_eig = -np.mean(np.linalg.eigh(self.Hessian)[0])
+            M = a_[:,None]*np.exp((f_[:,None]+self.g[None,:]-self.C+self.min_f[None,:])/self.epsilon)*np.sqrt(b_)[None,:]
+            self.Hessian = np.sum(M*np.sqrt(b_)[None,:],1)[:,None]*np.identity(self.a.shape[0])-np.dot( M , M.T )   
+            mean_eig = -np.mean(np.linalg.eigh(self.Hessian)[0])/self.epsilon
             self.Hessian = -self.Hessian/self.epsilon
-            self.Hessian =  self.Hessian + mean_eig*(self.reg_matrix)/self.epsilon
+            self.Hessian =  self.Hessian + mean_eig*self.reg_matrix
             # Compute solution of Ax = b:
             try:    
                 p_k = -np.linalg.solve(self.Hessian, grad_f)
@@ -76,12 +73,11 @@ class DampedNewton_SemiDual_np:
             self.alpha_list.append(alpha)
             # Update f and g:
             self.f = self.f + alpha*p_k
-            self.min_f = np.min(-self.epsilon*np.log(self.K)-self.f,0)
-            self.u  = np.exp(self.f/self.epsilon).reshape(self.f.shape[0],)
-            self.g = -self.epsilon*self._log_regularise(self.min_f,a_,self.u)
-            self.v  = np.exp(self.g/self.epsilon).reshape(self.g.shape[0],)
+            self.min_f = np.min(self.C-self.f,0)
+            f_ = self.f.reshape(self.a.shape[0],)
+            self.g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((f_[:,None]-self.C+self.min_f[None,:])/self.epsilon),0))
             # Error computation:
-            P  =  a_[:,None]*(self.u[:,None]*self.K*self.v[None,:]*np.exp(self.min_f/self.epsilon)[None,:])*b_[None,:]
+            P  =  a_[:,None]*(np.exp((f_[:,None]+self.g[None,:]-self.C+self.min_f[None,:])/self.epsilon))*b_[None,:]
             self.err.append(np.linalg.norm(np.sum(P,1)-a_,1))
             # Calculating objective function:
             value = self._objectivefunction(self.f)
@@ -93,10 +89,9 @@ class DampedNewton_SemiDual_np:
                 print("Terminating after iteration: ",i)
                 break
         return {
-            "potential_f"       : self.f.reshape(self.a.shape[0],),
-            "potential_g"       : self.g.reshape(self.b.shape[0],)+self.min_f,
+            "potential_f"       : self.f.reshape(self.a.shape[0],)+self.epsilon*np.log(self.a).reshape(self.a.shape[0],),
+            "potential_g"       : self.g.reshape(self.b.shape[0],)+self.epsilon*np.log(self.b).reshape(self.b.shape[0],)+self.min_f,
             "error"             : self.err,
             "objectives"        : self.objvalues,
             "linesearch_steps"  : self.alpha_list
         }
-
