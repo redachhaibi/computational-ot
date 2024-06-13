@@ -3,8 +3,8 @@ import scipy
 import time
 
 class DampedNewton_with_precodonditioner_SemiDual_np:
-    def __init__(self,K,a,b,f,g,epsilon,rho,c,null_vector,precond_vectors):
-        self.K = K
+    def __init__(self,C,a,b,f,g,epsilon,rho,c,null_vector,precond_vectors):
+        self.C = C
         self.a = a
         self.b = b
         self.f = f
@@ -19,23 +19,22 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         self.objvalues = [] 
         self.timing = []
         self.out = []
-        
-    def _log_regularise(self,min,a,u):
-        return np.log(np.sum(a[:,None]*u[:,None]*self.K*np.exp(min/self.epsilon)[None,:],0))
+
     
     def _objectivefunction(self,x):
         a_ = self.a.reshape(self.a.shape[0],)
-        u = np.exp(x/self.epsilon).reshape(x.shape[0],)
-        min_x = np.min(-self.epsilon*np.log(self.K)-x,0)
-        y = -self.epsilon*self._log_regularise(min_x,a_,u)+min_x[None,:]
-        return np.dot(x.T, self.a) + np.dot(y, self.b)    
-    
+        min_x = np.min(self.C-x,0)
+        x = x.reshape(self.a.shape[0],)
+        y = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((x[:,None]-self.C+min_x[None,:])/self.epsilon),0))+min_x[None,:]
+        return np.dot(x.T, self.a) + np.dot(y, self.b)   
+     
     def _computegradientf(self):
         a_ = self.a.reshape(self.a.shape[0],)
         b_ = self.b.reshape(self.b.shape[0],)
-        gradient = self.a-np.sum(a_[:,None]*self.u[:,None]*self.K*self.v[None,:]*b_[None,:]*np.exp(self.min_f/self.epsilon)[None,:], 1).reshape(self.a.shape[0],-1)
+        f_ = self.f.reshape(self.a.shape[0],)
+        gradient = self.a-np.sum(a_[:,None]*np.exp((f_[:,None]+self.g[None,:]-self.C+self.min_f[None,:])/self.epsilon)*b_[None,:], 1).reshape(self.a.shape[0],-1)
         return gradient
-
+    
         
     def _wolfe1(self,alpha,p,slope):
         "Bactracking"
@@ -429,7 +428,6 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         def mv(vector):
             return np.dot(matrix,vector) 
         start3 = time.time()
-        self.Hessian_stabilized = -matrix/self.epsilon
         if iterative_inversion >= 0:
           self.m = matrix
           A = scipy.sparse.linalg.LinearOperator( ( self.m.shape[0],self.m.shape[1] ), matvec = mv ) 
@@ -443,10 +441,8 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
           p_k = self.epsilon*inverse
           p_k = p_k.reshape( (p_k.shape[0], 1) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
         else:
-          start = time.time()
+          self.Hessian_stabilized = -matrix/self.epsilon
           p_k = -np.linalg.solve( self.Hessian_stabilized, gradient )
-          end = time.time()
-          print("p_k inverse time stamp: ", 1e-3*(end-start))        
         end = time.time()
         interval = 1e3*(end-start3)
         timings.append(interval)
@@ -546,7 +542,6 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         #
         # Solve either iteratively using CG or exactly
         start3 = time.time()
-        self.Hessian_stabilized = -matrix/self.epsilon
         if iterative_inversion >= 0:
           self.m = matrix
           A = scipy.sparse.linalg.LinearOperator( ( self.m.shape[0],self.m.shape[1] ), matvec=_preconditioned_map ) 
@@ -559,10 +554,11 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
           p_k = self.epsilon*inverse
           p_k = p_k.reshape( (p_k.shape[0], 1) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
         else:
-          start = time.time()
-          p_k = -np.linalg.solve( self.Hessian_stabilized, gradient)
-          end = time.time()
-          print("p_k inverse time stamp: ", 1e-3*(end-start))
+          B = np.dot( Ay, z.T)
+          C = z @ np.dot(y.T, Ay) @ z.T
+          matrix = matrix + B + B.T + C
+          self.Hessian_stabilized = -matrix/self.epsilon
+          p_k = -np.linalg.solve( self.Hessian_stabilized, gradient)        
         end = time.time()
         interval = 1e3*(end-start3)
         timings.append(interval)
@@ -690,21 +686,19 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         # print("|--- Time taken for the complete code block: ",np.round( interval,2),"ms---|\n")
         return p_k, timings
       
-
     def _update(self, tol = 1e-12, maxiter = 100, iterative_inversion = -1, version = 1, debug = False, optType = 'cg'):
         a_ = self.a.reshape(self.a.shape[0],)
         b_ = self.b.reshape(self.b.shape[0],)
-        self.min_f = np.min(-self.epsilon*np.log(self.K)-self.f,0)
-        self.u = np.exp(self.f/self.epsilon).reshape(self.f.shape[0],)
-        self.g = -self.epsilon*self._log_regularise(self.min_f,a_,self.u)
-        self.v = np.exp(self.g/self.epsilon).reshape(self.g.shape[0],)
+        self.min_f = np.min(self.C-self.f,0)
+        f_ = self.f.reshape(self.a.shape[0],)
+        self.g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((f_[:,None]-self.C+self.min_f[None,:])/self.epsilon),0))
         i = 0 
         while True:
-            # Compute gradient w.r.t f:   
+            # Compute gradient w.r.t f:
             grad_f = self._computegradientf()
             # Compute the Hessian:
-            M = a_[:,None]*self.u[:,None]*self.K*self.v[None,:]*np.exp(self.min_f/self.epsilon)[None,:]*np.sqrt(b_)[None,:]
-            self.Hessian = np.sum(M*np.sqrt(b_)[None,:],1)[:,None]*np.identity(self.a.shape[0])-np.dot( M , M.T ) 
+            M = a_[:,None]*np.exp((f_[:,None]+self.g[None,:]-self.C+self.min_f[None,:])/self.epsilon)*np.sqrt(b_)[None,:]
+            self.Hessian = np.sum(M*np.sqrt(b_)[None,:],1)[:,None]*np.identity(self.a.shape[0])-np.dot( M , M.T )   
             # Compute solution of Ax = b:
             if version == 4:
               print("\n At iteration: ",i)
@@ -761,13 +755,12 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
             self.alpha_list.append( alpha ) 
             # Update f and g:
             self.f = self.f + alpha*p_k
-            self.min_f = np.min(-self.epsilon*np.log(self.K)-self.f,0)
-            self.u  = np.exp(self.f/self.epsilon).reshape(self.f.shape[0],)
-            self.g = -self.epsilon*self._log_regularise(self.min_f,a_,self.u)
-            self.v  = np.exp(self.g/self.epsilon).reshape(self.g.shape[0],)
+            self.min_f = np.min(self.C-self.f,0)
+            f_ = self.f.reshape(self.a.shape[0],)
+            self.g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((f_[:,None]-self.C+self.min_f[None,:])/self.epsilon),0))
             # Error computation:
-            P  =  a_[:,None]*(self.u[:,None]*self.K*self.v[None,:]*np.exp(self.min_f/self.epsilon)[None,:])*b_[None,:]
-            self.err.append(np.linalg.norm(np.sum(P,1)-self.a,1))
+            P  =  a_[:,None]*(np.exp((f_[:,None]+self.g[None,:]-self.C+self.min_f[None,:])/self.epsilon))*b_[None,:]
+            self.err.append(np.linalg.norm(np.sum(P,1)-a_,1))
             # Calculating objective function:
             value = self._objectivefunction(self.f)
             self.objvalues.append(value[0])
@@ -779,8 +772,8 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
                 break            
             
         return {
-            "potential_f"       : self.f.reshape(self.a.shape[0],),
-            "potential_g"       : self.g.reshape(self.b.shape[0],)+self.min_f,
+            "potential_f"       : self.f.reshape(self.a.shape[0],)+self.epsilon*np.log(self.a).reshape(self.a.shape[0],),
+            "potential_g"       : self.g.reshape(self.b.shape[0],)+self.epsilon*np.log(self.b).reshape(self.b.shape[0],)+self.min_f,
             "error"             : self.err,
             "objectives"        : self.objvalues,
             "linesearch_steps"  : self.alpha_list,
