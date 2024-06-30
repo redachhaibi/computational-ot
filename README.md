@@ -17,15 +17,28 @@ The repository is structured as follows. We only describe the most important fil
 |  |-- linear.py      : Linear programming using cvxpy
 |  |-- linesearch.py  : Gradient ascent with line search using Armijo condition
 |  |-- sinkhorn.py    : Sinkhorn iterations
+|  |-- logdomain_sinkhorn.py    : exp-log regularized Sinkhorn iterations
+|  |-- Damped_Newton_SemiDual_numpy.py    : Semi-dual damped Newton with exact inversion of the Hessian
+|  |-- Damped_Newton_precond_SemiDual_numpy.py    : Semi-dual damped Newton with iterative inversion using preconditioning 
+
 |-- ipynb: Contains Python notebooks which demonstrate how the code works
 |  |-- DampedNewton.ipynb: Illustration of the method (Self explanatory).
-|  |-- DampedNewtonPreconditioning.ipynb: Illustration of the method (Self explanatory).
-|  |-- DampedNewtonPreconditioningBeta.ipynb: Initial draft printing all the spectral statistics.
-|  |-- DampedNewtonPreconditioningTesting.ipynb: Full testing, even with obsolete versions.
-|  |-- Demo.ipynb: Illustrates the various methods, in particular, Sinkhorn, Gradient ascent (fixed or line search), L-BGFS, Newton...
-|  |-- Multiscale.ipynb: Exploring multiscale resolution
-|  |-- NewtonSparsity*.ipynb: Exploring sparsity as $\epsilon$ goes to zero
+|  |-- DampedNewtonPreconditioning.ipynb: Illustration of the method (Self explanatory)
+|  |-- DampedNewtonPreconditionigFinal.ipynb : Illustration of the final version of the damped Newton with preconditioning method
+|  |-- DampedNewtonPreconditoningAllversions.ipynb : Illustration of all the version of the damped Newton with preconditoning method
+|  |-- DampedNewtonPreconditioning_fordiffparams.ipynb : Illustration of the damped Newton with preconditioning methond for different hyperparameters
+|  |-- SinkhornvsDampedNewton.ipynb : Illustration of the performance of the Sinkhorn algorithm and damped Newton algorithm
+|  |-- Spectralplots.ipynb : Illustration of the spectral plots from the Hessian obtained from algorithms: Sinkhorn, log-domain Sinkhorn and damped Newton
+|  |-- Demo.ipynb : Illustrates the various methods, in particular, Sinkhorn, Gradient ascent (fixed or line search), L-BGFS, Newton...
+|  |-- Multiscale.ipynb : Exploring multiscale resolution
+|  |-- NewtonSparsity-RCM-CAH.ipynb : Exploring sparsity as $\epsilon$ goes to zero
+|  |-- NewtonSparsityExperiments.ipynb : Illustration to understand the sparsity using Cuthill Mckee algorithm and nested dissection method
 |  |-- Sinkhorn.ipynb  : Benchmarking of Sinkhorn
+|  |-- Robutness.ipynb : Illustration of the robustness of the eigenvalues of the Hessian obtained from the log-domain Sinkhorn
+|  |-- log_domain_Sinkhorn_versions.ipynb  : Benchmarking of exp-log regularized Sinkhorn
+|  |-- SemiDual_damped_Newton_numpy.ipynb  : Benchmarking of Semi-dual damped Newton
+|  |-- Correctness.ipynb : Notebook to compare the convergence of the Kantorovich potentials for different algorithm with respect ot the exp-log regularized Sinkhorn algorithm as the ground truth
+
 |-- tests: Unit tests
 |-- README.md: This file
 ```
