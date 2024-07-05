@@ -25,7 +25,7 @@ setup(
 
     license='MIT License',
 
-    install_requires=["numpy", "matplotlib", "scipy", "cvxpy", "sklearn"],
+    install_requires=["numpy", "matplotlib", "scipy", "cvxpy", "scikit-learn"],
 
     keywords='',
 
