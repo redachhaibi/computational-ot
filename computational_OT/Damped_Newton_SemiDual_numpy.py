@@ -30,19 +30,20 @@ class DampedNewton_SemiDual_np:
         Computes the objective function : Q_semi(f) =  <f,a> + <g(f,C,epsilon),b>.
         """
         a_ = self.a.reshape(self.a.shape[0],)
-        min_f = np.min(self.C-f,0)# Computing minimum of  C-f for each column of this difference matrix.    
-        f = f.reshape(self.a.shape[0],)
-        g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((f[:,None]-self.C+min_f[None,:])/self.epsilon),0))+min_f[None,:]
-        Q_semi = np.dot(f, self.a) + np.dot(g, self.b) 
+        # Computing minimum of  C-f for each column of this difference matrix.
+        min_f = np.min(self.C-f,0)
+        g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((f-self.C+min_f[None,:])/self.epsilon),0))+min_f # Shape: (m,)
+        Q_semi = np.dot(f.T, self.a) + np.dot(g, self.b) 
         return Q_semi
+      
     def _computegradientf(self):
         """
             Compute gradient with respect to f of the objective funcion Q_semi(.).
         """
         a_ = self.a.reshape(self.a.shape[0],)
         b_ = self.b.reshape(self.b.shape[0],)
-        f_ = self.f.reshape(self.a.shape[0],)
-        exponent = -(self.C-f_[:,None])+self.g[None,:]+self.min_f[None,:]# Here self.g + self.min_f completes the log domain regularization of self.g.  
+        # Here self.g + self.min_f completes the log domain regularization of self.g.
+        exponent = (-(self.C-self.f)+self.min_f[None,:] )+self.g[None,:] 
         gradient = self.a-np.sum(a_[:,None]*np.exp(exponent/self.epsilon)*b_[None,:], 1).reshape(self.a.shape[0],-1)
         return gradient
 
@@ -61,16 +62,18 @@ class DampedNewton_SemiDual_np:
     def _update(self, tol=1e-12, maxiter = 100, debug = False):
         a_ = self.a.reshape(self.a.shape[0],)
         b_ = self.b.reshape(self.b.shape[0],)
-        self.min_f = np.min(self.C-self.f,0)# Computing minimum of  C-f for each column of this difference matrix.
-        f_ = self.f.reshape(self.a.shape[0],)# Shape: (n,)
-        # We know e^((-(C-f)+min_f)/epsilon)<1, therefore the value below is bounded.
-        self.g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((f_[:,None]-self.C+self.min_f[None,:])/self.epsilon),0))# Shape: (m,)
+        # Computing minimum of  C-f for each column of this difference matrix.
+        self.min_f = np.min(self.C-self.f,0)
+        # We know e^((-(C-f)+self.min_f)/epsilon)<1, therefore the value below is bounded.
+        self.g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((self.f-self.C+self.min_f[None,:])/self.epsilon),0))# Shape: (m,)
         i = 0
         while True: 
             # Compute gradient w.r.t f:
             grad_f = self._computegradientf()
             # Compute the Hessian:
-            M = a_[:,None]*np.exp((f_[:,None]+self.g[None,:]-self.C+self.min_f[None,:])/self.epsilon)*np.sqrt(b_)[None,:]# Adding self.min_f in the exponents in M completes the log-domain regularization of the Hessian.
+            ### Adding self.min_f in the exponents in M completes the  log-domain regularization of the Hessian.
+            exponent = (-(self.C-self.f)+self.min_f[None,:] )+self.g[None,:] 
+            M = a_[:,None]*np.exp(exponent/self.epsilon)*np.sqrt(b_)[None,:]
             self.Hessian = np.sum(M*np.sqrt(b_)[None,:],1)[:,None]*np.identity(self.a.shape[0])-np.dot( M , M.T )   
             mean_eig = np.mean(np.linalg.eigh(self.Hessian)[0])
             self.Hessian =  self.Hessian + mean_eig*self.reg_matrix
@@ -91,12 +94,12 @@ class DampedNewton_SemiDual_np:
             # Update f and g:
             self.f = self.f + alpha*p_k
             self.min_f = np.min(self.C-self.f,0)
-            f_ = self.f.reshape(self.a.shape[0],)
             # Updating the new self.g in the similar way as we did before starting the while loop.
-            self.g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((f_[:,None]-self.C+self.min_f[None,:])/self.epsilon),0))
+            self.g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((self.f-self.C+self.min_f[None,:])/self.epsilon),0))# Shape: (m,)
             # Error computation:
             ### Here similar to the Hessian the computation of the coupling P involves addition of the minimum self.min_f completing the log-domian regularization of self.g.
-            P  =  a_[:,None]*(np.exp((f_[:,None]+self.g[None,:]-self.C+self.min_f[None,:])/self.epsilon))*b_[None,:]
+            exponent = (-(self.C-self.f)+self.min_f[None,:] )+self.g[None,:] 
+            P  =  a_[:,None]*(np.exp(exponent/self.epsilon))*b_[None,:]
             self.err.append(np.linalg.norm(np.sum(P,1)-a_,1))
             # Calculating objective function:
             value = self._objectivefunction(self.f)
@@ -114,3 +117,4 @@ class DampedNewton_SemiDual_np:
             "objectives"        : self.objvalues,
             "linesearch_steps"  : self.alpha_list
         }
+ # end for    
