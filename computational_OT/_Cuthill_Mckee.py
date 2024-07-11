@@ -6,6 +6,11 @@ import matplotlib.pyplot as plt
 
 class _Expcuthill_mckee:
     def __init__(self,P):
+        """
+
+        Args:
+            P : The coupling.
+        """
         self.P=P
         self.P_xx=np.dot(P,P.T)
         self.P_yy=np.dot(P.T,P)

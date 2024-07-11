@@ -5,6 +5,19 @@ import time
 
 class DampedNewton_With_Preconditioner:
       def __init__(self,K,a,b,f,g,epsilon,rho,c,null_vector,precond_vectors):
+        """
+        
+        Args:
+            K : The Gibb's kernel of size n by m.
+            a : The measure a.
+            b : The measure b.
+            f : The initial Kantorovich potential f.
+            g : The initial Kantorovich potential g.
+            rho : Damping factor for the line search update step.
+            c : Damping factor for the slope in the Armijo's condition.
+            null_vector: null vector of the Hessian obtained from the unpreconditioned iteration of damped Newton.
+            precond_vector: preconditioning vectors from the selected eigenvalues obtained from the unpreconditioned iteration of damped Newton to be used for preconditioning the system <Hessian,p> = gradient, where p is the optimization direction vector.
+        """
         self.K = K
         self.a = a
         self.b = b
@@ -31,6 +44,7 @@ class DampedNewton_With_Preconditioner:
 
  
       def _computegradientg(self,g):
+        """Computes Gradient with respect to g"""
         u = np.exp(self.x[:self.a.shape[0]]/self.epsilon)
         v = np.exp(g/self.epsilon)
         return self.b-(v*np.dot(self.K.T,u)).reshape(g.shape[0],-1)
@@ -44,19 +58,26 @@ class DampedNewton_With_Preconditioner:
 
 
       def _wolfe1(self,alpha,p,slope):#Armijo Condition
-          """Backtracking""" 
+          """
           
+            Backtracking
+            Args:
+              alpha : The step size to update the potentials towards the optimal direction.
+              p : The optimal direction.
+              slope : It is the inner product between the gradient and p.
+            Returns:
+              alpha: The updated step size. 
+          """ 
           reduction_count = 0
           while True:
-            condition = self._objectivefunction(self.x+alpha*p)<self._objectivefunction(self.x)+self.c*alpha*slope 
+            condition = self._objectivefunction( self.x+alpha*p )<self._objectivefunction( self.x )+self.c*alpha*slope
             if condition or np.isnan(self._objectivefunction(self.x+alpha*p)):
               alpha = self.rho*alpha
               reduction_count += 1
             else:
               break
-
           return alpha
-      
+        
       # First implementation
       # To be made faster using
       # - vector operations only
@@ -722,6 +743,25 @@ class DampedNewton_With_Preconditioner:
       
 
       def _update(self, tol = 1e-11, maxiter = 100, iterative_inversion = -1, version = 1, debug = False, optType = 'cg'):
+        """
+        
+        Args:
+            tol : The tolerance limit for the error. Defaults to 1e-12.
+            maxiter :  The maximum iteration for the optimization algorithm. Defaults to 100.
+            iterative_inversion : The number of iterative inversions to be used. Defaults to -1.
+            version : The version of the precondioned iterative inversion to be used. Defaults to 1.
+            debug : To add a debug any step of the implementation when needed. Defaults to False.
+            optType : Input for the choice of iterative inversion algorithm, which here are Conjugate Gradient-'cg' and GMRES-'gmres. Defaults to 'cg'.
+
+        Returns:
+              potential_f : The optimal Kantorovich potential f.
+              potential_g : The optimal Kantorovich potential g.
+              error_a : The list of error of the estimation of the measure 'a' over the iteration of the algorithm.
+              error_b : The list of error of the estimation of the measure 'b' over the iteration of the algorithm.
+              objectives  : The list of objective function values over the iterations of the algorithm.
+              linesearch_steps : The list of step size along the iterations of the algorithm.
+              timings : The list of timestamps.
+        """
         i = 0
         while True :
             # Compute gradient    
@@ -834,7 +874,7 @@ class DampedNewton_With_Preconditioner:
             else:
                 print( "Terminating after iteration: ",i )
                 break
-
+        #end for
         return {
           "potential_f"      : self.x[:self.a.shape[0]].reshape(self.a.shape[0],),
           "potential_g"      : self.x[self.a.shape[0]:].reshape(self.b.shape[0],),
@@ -845,4 +885,3 @@ class DampedNewton_With_Preconditioner:
           "timings"          : self.timing  
         }
 
- # end for    

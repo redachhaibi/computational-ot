@@ -2,6 +2,14 @@ import torch
 torch.set_default_dtype(torch.float64)
 class torchLog_domainSinkhorn:
     def __init__(self, a, b, C, epsilon):
+        """
+        
+        Args:
+            a : The measure a.
+            b : The measure b.
+            C : The cost matrix of size n by m.
+            epsilon : The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
+        """
         self.a = a
         self.b = b
         self.C = C
@@ -21,6 +29,17 @@ class torchLog_domainSinkhorn:
         return self.minb_u(H - torch.min(H, 1)[0][:, None]) + torch.min(H, 1)[0]
 
     def update(self, tol = 1e-12, niter = 500):
+        """
+        
+        Args:
+            tol  : The tolerance limit for the error. Defaults to 1e-12.
+            niter : The maximum iteration for the optimization algorithm. Defaults to 500.
+
+        Returns:
+            error : The list of error values over the iteration of the algorithm.
+            potential_f : The optimal Kantorovich potential f.
+            potential_g : The optimal Kantorovich potential g.
+        """
         f, g = self.a, self.b
         for i in range(niter):
             g = self.mina(self.C - f[:, None])

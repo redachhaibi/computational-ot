@@ -4,6 +4,16 @@ import scipy as sc
 
 class L_BFGS_B:
     def __init__(self,K,a,b,f,g,epsilon):
+        """
+
+        Args:
+            K : The Gibb's kernel of size n by m.
+            a : The measure a.
+            b : The measure b.
+            f : The initial Kantorovich potential f.
+            g : The initial Kantorovich potential g.
+            epsilon : The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
+        """
         self.K = K
         self.a = a
         self.b = b
@@ -28,7 +38,24 @@ class L_BFGS_B:
 
     
     def _update(self, tol = 1e-12,maxiter = 1000, maxf = 1,maxiter_lbgfs = 1,pgt = 1e-20,maxl = 10,factor = 100000000.0):
-        
+        """
+
+        Args:
+            tol  : The tolerance limit for the error. Defaults to 1e-12.
+            maxiter  : The maximum iteration for the optimization algorithm. Defaults to 1000.
+            maxf : Maximum number of function evaluations. Defaults to 1.
+            maxiter_lbgfs : Maximum number of iterations. Defaults to 1.
+            pgt : The iteration will stop when max{|proj g_i | i = 1, ..., n} <= pgtol where proj g_i is the i-th component of the projected gradient. Defaults to 1e-20.
+            maxl : Maximum number of line search steps (per iteration). Defaults to 10.
+            factor : The iteration stops when (f^k - f^{k+1})/max{|f^k|,|f^{k+1}|,1} <= factr * eps. Defaults to 100000000.0.
+
+        Returns:
+            potential_f : The optimal Kantorovich potential f.
+            potential_g : The optimal Kantorovich potential g.
+            error_a : The list of error of the estimation of the measure 'a' over the iteration of the algorithm.
+            error_b : The list of error of the estimation of the measure 'b' over the iteration of the algorithm.
+            objectives  : The list of objective function values over the iterations of the algorithm.
+        """
         i = 0
         while True :
     

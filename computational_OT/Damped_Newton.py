@@ -2,6 +2,18 @@ import numpy as np
 import logging
 class DampedNewton:
       def __init__(self,K,a,b,f,g,epsilon,rho,c):
+        """
+        
+        Args:
+          K : The Gibb's kernel of size n by m.
+          a : The measure a.
+          b : The measure b.
+          f : The initial Kantorovich potential f.
+          g : The initial Kantorovich potential g.
+          rho : Damping factor for the line search update step.
+          c : Damping factor for the slope in the Armijo's condition.
+          epsilon : The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
+        """
         self.K = K
         self.a = a
         self.b = b
@@ -30,6 +42,7 @@ class DampedNewton:
 
  
       def _computegradientg(self,g):
+        """Computes Gradient with respect to g"""
         u = np.exp( self.x[:self.a.shape[0]]/self.epsilon )
         v = np.exp( g/self.epsilon )
         return self.b-( v*np.dot( self.K.T,u ) ).reshape( g.shape[0],-1 )
@@ -42,8 +55,16 @@ class DampedNewton:
         return np.dot( f.T,self.a )+np.dot( g.T,self.b )+regularizer
 
       def _wolfe1(self,alpha,p,slope):#Armijo Condition
-          """Backtracking""" 
+          """
           
+            Backtracking
+            Args:
+              alpha : The step size to update the potentials towards the optimal direction.
+              p : The optimal direction.
+              slope : It is the inner product between the gradient and p.
+            Returns:
+              alpha: The updated step size. 
+          """ 
           reduction_count = 0
           while True:
             condition = self._objectivefunction( self.x+alpha*p )<self._objectivefunction( self.x )+self.c*alpha*slope
@@ -54,9 +75,24 @@ class DampedNewton:
               break
           return alpha
 
-      
 
       def _update(self, tol=1e-12, maxiter=100, debug=False):
+        """
+
+        Args:
+            tol  : The tolerance limit for the error. Defaults to 1e-12.
+            maxiter  : The maximum iteration for the optimization algorithm. Defaults to 100.
+            debug : To add a debug any step of the implementation when needed. Defaults to False.
+
+        Returns:
+            potential_f : The optimal Kantorovich potential f.
+            potential_g : The optimal Kantorovich potential g.
+            error_a : The list of error of the estimation of the measure 'a' over the iteration of the algorithm.
+            error_b : The list of error of the estimation of the measure 'b' over the iteration of the algorithm.
+            objectives  : The list of objective function values over the iterations of the algorithm.
+            linesearch_steps : The list of step size along the iterations of the algorithm.
+
+        """
         i=0
         while True :
             

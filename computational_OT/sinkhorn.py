@@ -3,6 +3,16 @@ import numpy as np
 class Sinkhorn:
 
   def __init__(self,K,a,b,u,v,epsilon):
+    """
+    
+    Args:
+        K : The Gibb's kernel of size n by m.
+        a : The measure a.
+        b : The measure b.
+        u : The initial left marginal of the coupling.
+        v : The initial  right marginal of the coupling.
+        epsilon : The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
+    """
     self.K = K
     self.a = a
     self.b = b
@@ -23,6 +33,19 @@ class Sinkhorn:
 
 
   def _update(self, tol=1e-12, maxiter=1000):
+    """
+
+    Args:
+      tol  : The tolerance limit for the error. Defaults to 1e-12.
+      maxiter  : The maximum iteration for the optimization algorithm. Defaults to 1000.
+
+    Returns:
+      potential_f : The optimal Kantorovich potential f.
+      potential_g : The optimal Kantorovich potential g.
+      error_a : The list of error of the estimation of the measure 'a' over the iteration of the algorithm.
+      error_b : The list of error of the estimation of the measure 'b' over the iteration of the algorithm.
+      objectives  : The list of objective function values over the iterations of the algorithm.
+    """
     i = 0
     while True :
       self.obj.append(self._objectivefunction())

@@ -1,10 +1,22 @@
 import numpy as np
-from numpy import linalg as Lin
 
 class LineSearch:
 
-
-      def __init__(self,K,a,b,f,g,epsilon,rho,rho_inc,c1,c2,z):
+      def __init__(self,K,a,b,f,g,epsilon,rho,rho_inc,c1,z):
+        """
+        
+        Args:
+            K : The Gibb's kernel of size n by m.
+            a : The measure a.
+            b : The measure b.
+            f : The initial Kantorovich potential f.
+            g : The initial Kantorovich potential g.
+            epsilon : The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
+            rho : Damping factor for the line search update step.
+            rho_inc (_type_): Factor to increase the line search update step
+            c1 (_type_): Damping factor for the slope in the Armijo's condition.
+            z (_type_): Initial update step.
+        """
         self.K = K
         self.a = a
         self.b = b
@@ -13,7 +25,6 @@ class LineSearch:
         self.rho = rho
         self.rho_inc = rho_inc
         self.c1 = c1
-        self.c2 = c2
         self.z = z
         self.alpha = []
         self.err_a = []
@@ -35,9 +46,16 @@ class LineSearch:
         return np.dot(f.T,self.a)+np.dot(g.T,self.b)-self.epsilon*np.dot(np.exp(f/self.epsilon).T,np.dot(self.K,np.exp(g/self.epsilon)))
       
       def _wolfe1(self,alpha,p,slope):#Armijo Condition
-          """Backtracking""" 
+          """
           
-
+            Backtracking
+            Args:
+              alpha : The step size to update the potentials towards the optimal direction.
+              p : The optimal direction.
+              slope : It is the inner product between the gradient and p.
+            Returns:
+              alpha: The updated step size. 
+          """ 
           reduction_count = 0
           while True:
             condition = self._objectivefunction(self.x+alpha*p) < self._objectivefunction(self.x)+self.c1*alpha*slope
@@ -53,13 +71,22 @@ class LineSearch:
 
           return alpha
 
-        
-      
-    
-            
-
       def _update(self, tol=1e-12, maxiter=1000):
+        """
         
+        Args:
+            tol  : The tolerance limit for the error. Defaults to 1e-12.
+            maxiter  : The maximum iteration for the optimization algorithm. Defaults to 1000.
+            
+        Returns:
+            potential_f : The optimal Kantorovich potential f.
+            potential_g : The optimal Kantorovich potential g.
+            error_a : The list of error of the estimation of the measure 'a' over the iteration of the algorithm.
+            error_b : The list of error of the estimation of the measure 'b' over the iteration of the algorithm.
+            objectives  : The list of objective function values over the iterations of the algorithm.
+            linesearch_steps : The list of step size along the iterations of the algorithm.
+
+        """
         i = 0
         while True :
             grad_f = self._computegradientf(self.x[:,0])
@@ -82,14 +109,14 @@ class LineSearch:
            
             # error computation 1
             s = np.exp(self.x[:,0]/self.epsilon)*np.dot(self.K,np.exp(self.x[:,1]/self.epsilon))
-            self.err_a.append(Lin.norm(s - self.a))
+            self.err_a.append(np.linalg.norm(s - self.a))
 
 
             #updating g
             self.x[:,1] = self.x[:,1]+self.alpha[i]*p_k[:,1]
             # error computation 2
             r = np.exp(self.x[:,1]/self.epsilon)*np.dot(self.K .T, np.exp(self.x[:,0]/self.epsilon))
-            self.err_b.append(Lin.norm(r - self.b))
+            self.err_b.append(np.linalg.norm(r - self.b))
 
             #Calculating Objective values
             self.objvalues.append(self._objectivefunction(self.x))

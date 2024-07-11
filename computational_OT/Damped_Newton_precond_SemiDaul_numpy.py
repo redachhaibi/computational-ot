@@ -5,15 +5,16 @@ import time
 class DampedNewton_with_precodonditioner_SemiDual_np:
     def __init__(self,C,a,b,f,epsilon,rho,c,null_vector,precond_vectors):
         """
-        Input parameters:
-        C : Cost matrix of size n by m.
-        (a,b) : The two measures of the OT problem, the shape of which is (n,1) and (m,1) respectively.
-        f : Kantorovich potential f, which is of shape (n,1).
-        rho : Damping factor for the line search update step.
-        epsilon : The entropy regularization factor.
-        c : Damping factor for the slope in the Armijo's condition.
-        null_vector: null vector of the Hessian obtained from the unpreconditioned iteration of semi-dual damped Newton.
-        precond_vector: preconditioning vectors from the selected eigenvalues obtained from the unpreconditioned iteration of semi-dual damped Newton to be used for preconditioning the system <Hessian,p> = gradient, where p is the optimization direction vector.
+        
+        Arg:
+          C : Cost matrix of size n by m.
+          (a,b) : The two measures of the OT problem, the shape of which is (n,1) and (m,1) respectively.
+          f : Kantorovich potential f, which is of shape (n,1).
+          rho : Damping factor for the line search update step.
+          epsilon : The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
+          c : Damping factor for the slope in the Armijo's condition.
+          null_vector: null vector of the Hessian obtained from the unpreconditioned iteration of semi-dual damped Newton.
+          precond_vector: preconditioning vectors from the selected eigenvalues obtained from the unpreconditioned iteration of semi-dual damped Newton to be used for preconditioning the system <Hessian,p> = gradient, where p is the optimization direction vector.
         """
         self.C = C
         self.a = a
@@ -32,7 +33,10 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
 
     def _objectivefunction(self,f):
         """
-        Computes the objective function : Q_semi(f) =  <f,a> + <g(f,C,epsilon),b>.
+        
+        Args:
+          f: The Kantorovich potential f.
+        Returns : Q_semi(f) =  <f,a> + <g(f,C,epsilon),b>.
         """
         a_ = self.a.reshape(self.a.shape[0],)
         # Computing minimum of  C-f for each column of this difference matrix.
@@ -53,7 +57,16 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         return gradient
 
     def _wolfe1(self,alpha,p,slope):#Armijo Condition
-          """Backtracking""" 
+          """
+            
+            Backtracking
+            Args:
+              alpha : The step size to update the potentials towards the optimal direction.
+              p : The optimal direction.
+              slope : It is the inner product between the gradient and p.
+            Returns:
+              alpha: The updated step size. 
+          """ 
           reduction_count = 0           
           while True:   
             condition = self._objectivefunction( self.f+alpha*p )< self._objectivefunction( self.f )+self.c*alpha*slope
@@ -144,7 +157,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         # Unwind
         for transform in unwinding_transformations:
           P,f = transform
-          p_k = f(P,p_k)
+          p_k = f(P,p_k)    
         end = time.time()
         interval = 1e3*( end-start4 )
         timings.append( interval )
@@ -682,11 +695,29 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         return p_k, timings
     
     def _update(self, tol = 1e-12, maxiter = 100, iterative_inversion = -1, version = 1, debug = False, optType = 'cg'):
+        """
+        
+        Args:
+            tol : The tolerance limit for the error. Defaults to 1e-12.
+            maxiter :  The maximum iteration for the optimization algorithm. Defaults to 100.
+            iterative_inversion : The number of iterative inversions to be used. Defaults to -1.
+            version : The version of the precondioned iterative inversion to be used. Defaults to 1.
+            debug : To add a debug any step of the implementation when needed. Defaults to False.
+            optType : Input for the choice of iterative inversion algorithm, which here are Conjugate Gradient-'cg' and GMRES-'gmres. Defaults to 'cg'.
+
+        Returns:
+              potential_f : The optimal Kantorovich potential f.
+              potential_g : The optimal Kantorovich potential g.
+              error : The list of error values over the iteration of the algorithm.
+              objectives  : The list of objective function values over the iterations of the algorithm.
+              linesearch_steps : The list of step size along the iterations of the algorithm.
+              timings : The list of timestamps.
+        """
         a_ = self.a.reshape(self.a.shape[0],)
         b_ = self.b.reshape(self.b.shape[0],)
         # Computing minimum of  C-f for each column of this difference matrix.
         self.min_f = np.min(self.C-self.f,0)
-        # We know e^((-(C-f)+self.min_f)/epsilon)<1, therefore the value below is bounded.
+        # We know e^((-(C-f)+self.min_f)/epsilon)<1, therefore the value of self.g below is bounded.
         self.g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((self.f-self.C+self.min_f[None,:])/self.epsilon),0))# Shape: (m,)
         i = 0 
         while True:
@@ -767,8 +798,8 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
                 i+=1
             else:   
                 print("Terminating after iteration: ",i)
-                break            
-            
+                break  
+        # end for        
         return {
             "potential_f"       : self.f.reshape(self.a.shape[0],)+self.epsilon*np.log(self.a).reshape(self.a.shape[0],),
             "potential_g"       : self.g.reshape(self.b.shape[0],)+self.epsilon*np.log(self.b).reshape(self.b.shape[0],)+self.min_f,
@@ -778,5 +809,4 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
             "timings"           : self.timing,
         }
 
- # end for    
 
