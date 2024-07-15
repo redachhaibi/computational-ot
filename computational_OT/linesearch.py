@@ -52,7 +52,7 @@ class LineSearch:
             Args:
               alpha : The step size to update the potentials towards the optimal direction.
               p : The optimal direction.
-              slope : It is the inner product between the gradient and p.
+              slope : It is the inner product of the gradient and p.
             Returns:
               alpha: The updated step size. 
           """ 
