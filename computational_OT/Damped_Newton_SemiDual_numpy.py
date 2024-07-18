@@ -17,31 +17,31 @@ class DampedNewton_SemiDual_np:
         self.b = b
         self.f = f
         self.rho = rho
-        self.epsilon = epsilon
+        self.epsilon = epsilon  
         self.c = c
         self.alpha_list = []
         self.err = []
         self.objvalues = [] 
-        null_vector = np.hstack(np.ones(self.a.shape[0]))/np.sqrt(self.a.shape[0])
+        null_vector = np.ones(self.a.shape[0])/np.sqrt(self.a.shape[0])
         self.null_vector = np.reshape(null_vector, (self.a.shape[0],1))
         self.reg_matrix = np.dot( self.null_vector, self.null_vector.T )
 
     def _objectivefunction(self,f):
-        """
+        """ 
         Args:
           f: The Kantorovich potential f.
         Returns : Q_semi(f) =  <f,a> + <g(f,C,epsilon),b>.
         """
         a_ = self.a.reshape(self.a.shape[0],)
         # Computing minimum of  C-f for each column of this difference matrix.
-        min_f = np.min(self.C-f,0)
+        min_f = np.min(self.C-f,0)# Shape: (m,)
         g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((f-self.C+min_f[None,:])/self.epsilon),0))+min_f # Shape: (m,)
         Q_semi = np.dot(f.T, self.a) + np.dot(g, self.b) 
         return Q_semi
       
     def _computegradientf(self):
         """
-            Compute gradient with respect to f of the objective funcion Q_semi(.).
+            Compute gradient with respect to f of the objective function Q_semi(.).
         """
         a_ = self.a.reshape(self.a.shape[0],)
         b_ = self.b.reshape(self.b.shape[0],)
@@ -55,9 +55,9 @@ class DampedNewton_SemiDual_np:
           
             Backtracking
             Args:
-              alpha : The step size to update the potentials towards the optimal direction.
-              p : The optimal direction.
-              slope : It is the inner product of the gradient and p.
+                alpha : The step size to update the potentials towards the optimal direction.
+                p : The optimal direction.
+                slope : It is the inner product of the gradient and p.
             Returns:
               alpha: The updated step size. 
           """ 
@@ -108,9 +108,9 @@ class DampedNewton_SemiDual_np:
             try:    
                 p_k = -np.linalg.solve(self.Hessian, grad_f)
             except:
-                print("Inverse does not exist at epsilon:", self.epsilon)
+                print("Inverse does not exist at epsilon:", self.epsilon)   
                 return np.zeros(6)
-            
+    
             p_k = p_k - self.null_vector*np.dot( self.null_vector.flatten(), p_k.flatten() )
             # Wolfe condition 1: Armijo Condition:  
             slope = np.dot(p_k.T, grad_f)[0][0]
@@ -119,13 +119,13 @@ class DampedNewton_SemiDual_np:
             self.alpha_list.append(alpha)
             # Update f and g:
             self.f = self.f + alpha*p_k
-            self.min_f = np.min(self.C-self.f,0)
+            self.min_f = np.min(self.C-self.f,0)    
             # Updating the new self.g in the similar way as we did before starting the while loop.
             self.g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((self.f-self.C+self.min_f[None,:])/self.epsilon),0))# Shape: (m,)
-            # Error computation:
             ### Here similar to the Hessian the computation of the coupling P involves addition of the minimum self.min_f completing the log-domian regularization of self.g.
             exponent = (-(self.C-self.f)+self.min_f[None,:] )+self.g[None,:] 
             P  =  a_[:,None]*(np.exp(exponent/self.epsilon))*b_[None,:]
+            # Error computation:
             self.err.append(np.linalg.norm(np.sum(P,1)-a_,1))
             # Calculating objective function:
             value = self._objectivefunction(self.f)
