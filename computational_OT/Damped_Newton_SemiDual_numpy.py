@@ -32,22 +32,20 @@ class DampedNewton_SemiDual_np:
           f: The Kantorovich potential f.
         Returns : Q_semi(f) =  <f,a> + <g(f,C,epsilon),b>.
         """
-        a_ = self.a.reshape(self.a.shape[0],)
         # Computing minimum of  C-f for each column of this difference matrix.
-        min_f = np.min(self.C-f,0)# Shape: (m,)
-        g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((f-self.C+min_f[None,:])/self.epsilon),0))+min_f # Shape: (m,)
-        Q_semi = np.dot(f.T, self.a) + np.dot(g, self.b) 
+        min_f = np.min(self.C-f[:,None],0)# Shape: (m,)
+        H = f[:,None]-self.C+min_f[None,:]
+        g = -self.epsilon*np.log(np.sum(self.a[:,None]*np.exp(H/self.epsilon),0))+min_f # Shape: (m,)
+        Q_semi = np.dot(f, self.a) + np.dot(g, self.b) 
         return Q_semi
       
     def _computegradientf(self):
-        """
+        """ 
             Compute gradient with respect to f of the objective function Q_semi(.).
         """
-        a_ = self.a.reshape(self.a.shape[0],)
-        b_ = self.b.reshape(self.b.shape[0],)
         # Here self.g + self.min_f completes the log domain regularization of self.g.
-        exponent = (-(self.C-self.f)+self.min_f[None,:] )+self.g[None,:] 
-        gradient = self.a-np.sum(a_[:,None]*np.exp(exponent/self.epsilon)*b_[None,:], 1).reshape(self.a.shape[0],-1)
+        exponent = (-(self.C-self.f[:,None])+self.min_f[None,:] )+self.g[None,:] 
+        gradient = self.a-np.sum( self.a[:,None]*np.exp(exponent/self.epsilon)*self.b[None,:], 1)
         return gradient
 
     def _wolfe1(self,alpha,p,slope):#Armijo Condition
@@ -70,6 +68,7 @@ class DampedNewton_SemiDual_np:
             else:
               break
           return alpha
+        
       
     def _update(self, tol=1e-12, maxiter = 100, debug = False):
         """
@@ -86,21 +85,22 @@ class DampedNewton_SemiDual_np:
             objectives  : The list of objective function values over the iterations of the algorithm.
             linesearch_steps : The list of step size along the iterations of the algorithm.
         """
-        a_ = self.a.reshape(self.a.shape[0],)
-        b_ = self.b.reshape(self.b.shape[0],)
         # Computing minimum of  C-f for each column of this difference matrix.
-        self.min_f = np.min(self.C-self.f,0)
+        self.min_f = np.min(self.C-self.f[:,None],0)
         # We know e^((-(C-f)+self.min_f)/epsilon)<1, therefore the value of self.g below is bounded.
-        self.g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((self.f-self.C+self.min_f[None,:])/self.epsilon),0))# Shape: (m,)
+        H = -self.C+self.f[:,None]+self.min_f[None,:]
+        self.g = -self.epsilon*np.log( np.sum(self.a[:,None]*np.exp(H/self.epsilon),0) )
         i = 0
         while True: 
             # Compute gradient w.r.t f:
             grad_f = self._computegradientf()
             # Compute the Hessian:
             ### Adding self.min_f in the exponents in M completes the  log-domain regularization of the Hessian.
-            exponent = (-(self.C-self.f)+self.min_f[None,:] )+self.g[None,:] 
-            M = a_[:,None]*np.exp(exponent/self.epsilon)*np.sqrt(b_)[None,:]
-            self.Hessian = np.sum(M*np.sqrt(b_)[None,:],1)[:,None]*np.identity(self.a.shape[0])-np.dot( M , M.T )   
+            exponent = (-(self.C-self.f[:,None])+self.min_f[None,:] )+self.g[None,:] 
+            M =  self.a[:,None]*np.exp(exponent/self.epsilon)*np.sqrt( self.b)[None,:]
+            S = np.sum(M*np.sqrt(self.b)[None,:],1)
+            self.Hessian = S[:,None]*np.identity(self.a.shape[0])-np.dot( M , M.T )  
+            ### Regularizing the Hessian using the regularization vector with the factor being being the mean of eigenvalues of the Hessian 
             mean_eig = np.mean(np.linalg.eigh(self.Hessian)[0])
             self.Hessian =  self.Hessian + mean_eig*self.reg_matrix
             self.Hessian = -self.Hessian/self.epsilon
@@ -110,26 +110,26 @@ class DampedNewton_SemiDual_np:
             except:
                 print("Inverse does not exist at epsilon:", self.epsilon)   
                 return np.zeros(6)
-    
-            p_k = p_k - self.null_vector*np.dot( self.null_vector.flatten(), p_k.flatten() )
+            p_k = p_k - self.null_vector.flatten()*np.dot( self.null_vector.flatten(), p_k )
             # Wolfe condition 1: Armijo Condition:  
-            slope = np.dot(p_k.T, grad_f)[0][0]
+            slope = np.dot(p_k, grad_f)
             alpha = 1
             alpha = self._wolfe1(alpha, p_k, slope)
             self.alpha_list.append(alpha)
             # Update f and g:
             self.f = self.f + alpha*p_k
-            self.min_f = np.min(self.C-self.f,0)    
+            self.min_f = np.min(self.C-self.f[:,None],0)    
             # Updating the new self.g in the similar way as we did before starting the while loop.
-            self.g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((self.f-self.C+self.min_f[None,:])/self.epsilon),0))# Shape: (m,)
+            H = -self.C+self.f[:,None]+self.min_f[None,:]
+            self.g = -self.epsilon*np.log( np.sum(self.a[:,None]*np.exp(H/self.epsilon),0) )
             ### Here similar to the Hessian the computation of the coupling P involves addition of the minimum self.min_f completing the log-domian regularization of self.g.
-            exponent = (-(self.C-self.f)+self.min_f[None,:] )+self.g[None,:] 
-            P  =  a_[:,None]*(np.exp(exponent/self.epsilon))*b_[None,:]
+            exponent = (-(self.C-self.f[:,None])+self.min_f[None,:] )+self.g[None,:] 
+            P  =   self.a[:,None]*(np.exp(exponent/self.epsilon))*self.b[None,:]
             # Error computation:
-            self.err.append(np.linalg.norm(np.sum(P,1)-a_,1))
+            self.err.append(np.linalg.norm(np.sum(P,1)- self.a,1))
             # Calculating objective function:
             value = self._objectivefunction(self.f)
-            self.objvalues.append(value[0])
+            self.objvalues.append(value)
             # Check error:
             if i< maxiter and ( self.err[-1]>tol ):
                 i+=1

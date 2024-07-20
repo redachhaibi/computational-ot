@@ -32,38 +32,35 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         self.out = []
 
     def _objectivefunction(self,f):
-        """
-        
+        """ 
         Args:
           f: The Kantorovich potential f.
         Returns : Q_semi(f) =  <f,a> + <g(f,C,epsilon),b>.
         """
-        a_ = self.a.reshape(self.a.shape[0],)
         # Computing minimum of  C-f for each column of this difference matrix.
-        min_f = np.min(self.C-f,0)
-        g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((f-self.C+min_f[None,:])/self.epsilon),0))+min_f # Shape: (m,)
-        Q_semi = np.dot(f.T, self.a) + np.dot(g, self.b) 
+        min_f = np.min(self.C-f[:,None],0)# Shape: (m,)
+        H = f[:,None]-self.C+min_f[None,:]
+        g = -self.epsilon*np.log(np.sum(self.a[:,None]*np.exp(H/self.epsilon),0))+min_f # Shape: (m,)
+        Q_semi = np.dot(f, self.a) + np.dot(g, self.b) 
         return Q_semi
       
     def _computegradientf(self):
+        """ 
+            Compute gradient with respect to f of the objective function Q_semi(.).
         """
-            Compute gradient with respect to f of the objective funcion Q_semi(.).
-        """
-        a_ = self.a.reshape(self.a.shape[0],)
-        b_ = self.b.reshape(self.b.shape[0],)
         # Here self.g + self.min_f completes the log domain regularization of self.g.
-        exponent = (-(self.C-self.f)+self.min_f[None,:] )+self.g[None,:] 
-        gradient = self.a-np.sum(a_[:,None]*np.exp(exponent/self.epsilon)*b_[None,:], 1).reshape(self.a.shape[0],-1)
+        exponent = (-(self.C-self.f[:,None])+self.min_f[None,:] )+self.g[None,:] 
+        gradient = self.a-np.sum( self.a[:,None]*np.exp(exponent/self.epsilon)* self.b[None,:], 1)
         return gradient
 
     def _wolfe1(self,alpha,p,slope):#Armijo Condition
           """
-            
+          
             Backtracking
             Args:
-              alpha : The step size to update the potentials towards the optimal direction.
-              p : The optimal direction.
-              slope : It is the inner product of the gradient and p.
+                alpha : The step size to update the potentials towards the optimal direction.
+                p : The optimal direction.
+                slope : It is the inner product of the gradient and p.
             Returns:
               alpha: The updated step size. 
           """ 
@@ -76,7 +73,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
             else:
               break
           return alpha
-    
+          
     def _precond_inversion_v0( self, unnormalized_Hessian, gradient, iterative_inversion=-1, debug=False ):
         timings = []  
         start = time.time()
@@ -96,7 +93,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         vector = vector.reshape( (len(vector), 1) )
         matrix = matrix + np.dot( vector, vector.T )
         # Transformations
-        gradient = diag[:,None]*gradient
+        gradient = diag[:,None]*gradient[:,None]
         unwinding_transformations.append( [diag, lambda d,x : d[:,None]*x] )
 
         # Conditioning with other vectors
@@ -188,7 +185,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         vector = vector.reshape( ( len( vector ), 1) )
         matrix = matrix + np.dot( vector, vector.T )
         # Transformations
-        gradient = diag[:,None]*gradient
+        gradient = diag[:,None]*gradient[:,None]
         unwinding_transformations.append( [diag, lambda d,x : d[:,None]*x] )
         end = time.time()
         interval = 1e3*( end-start )
@@ -286,7 +283,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         vector = vector.reshape( (len( vector ), 1) )
         matrix = matrix + np.dot( vector, vector.T )
         # Transformations
-        gradient = diag[:,None]*gradient
+        gradient = diag[:,None]*gradient[:,None]
         unwinding_transformations.append( [diag, lambda d,x : d[:,None]*x] )
         end = time.time()
         interval = 1e3*( end-start )
@@ -407,7 +404,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         vector = vector.reshape( (len(vector), 1) )
         matrix = matrix + np.dot( vector, vector.T)
         # Transformations
-        gradient = diag[:,None]*gradient
+        gradient = diag[:,None]*gradient[:,None]
         unwinding_transformations.append( [diag, lambda d,x : d[:,None]*x])
         # Record timing 
         end = time.time()
@@ -499,7 +496,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         vector = vector/np.linalg.norm(vector)
         vector_E = vector
         # Transformations (Initial on gradient and final on result)
-        gradient = diag[:,None]*gradient
+        gradient = diag[:,None]*gradient[:,None]
         unwinding_transformations.append( lambda x : diag[:,None]*x )
         # Record timing
         end = time.time()
@@ -542,7 +539,6 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
           vector = np.dot( matrix, vector)  + vector_E*np.dot(vector_E, vector)
           vector = _apply_P( vector ) 
           return vector
-        
         # Apply P
         # At beginning on gradient
         # At the end 
@@ -552,7 +548,6 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         interval = 1e3*(end-start2)
         timings.append( interval )
         print( "|--- Time required for changing A to PAP: ", np.round( interval,5 ) ,"ms---|" )
-                
         #
         # Solve either iteratively using CG or exactly
         start3 = time.time()
@@ -579,6 +574,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         print( "|--- Time taken to invert the linear system for p_k: ",np.round( interval,5),"ms---|" )
         start4 = time.time()
         # Unwind
+
         for transform in unwinding_transformations:
           p_k = transform(p_k)
         end = time.time()
@@ -610,7 +606,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
           vector = vector.reshape( (len(vector), 1) )
           matrix = matrix + np.dot( vector, vector.T)
         # Transformations (Initial on gradient and final on result)
-        gradient = diag[:,None]*gradient
+        gradient = diag[:,None]*gradient[:,None]
         unwinding_transformations.append(lambda x : diag[:,None]*x)
         # Record timing
         end = time.time()
@@ -683,6 +679,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         interval = 1e3*(end-start3)
         timings.append(interval)
         start4 = time.time()
+    
         # Unwind
         for transform in unwinding_transformations:
           p_k = transform(p_k)
@@ -713,21 +710,21 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
               linesearch_steps : The list of step size along the iterations of the algorithm.
               timings : The list of timestamps.
         """
-        a_ = self.a.reshape(self.a.shape[0],)
-        b_ = self.b.reshape(self.b.shape[0],)
         # Computing minimum of  C-f for each column of this difference matrix.
-        self.min_f = np.min(self.C-self.f,0)
+        self.min_f = np.min(self.C-self.f[:,None],0)
         # We know e^((-(C-f)+self.min_f)/epsilon)<1, therefore the value of self.g below is bounded.
-        self.g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((self.f-self.C+self.min_f[None,:])/self.epsilon),0))# Shape: (m,)
+        H = -self.C+self.f[:,None]+self.min_f[None,:]
+        self.g = -self.epsilon*np.log( np.sum(self.a[:,None]*np.exp(H/self.epsilon),0) )
         i = 0 
         while True:
-           # Compute gradient w.r.t f:
+            # Compute gradient w.r.t f:
             grad_f = self._computegradientf()
             # Compute the Hessian:
             ### Adding self.min_f in the exponents in M completes the  log-domain regularization of the Hessian.
-            exponent = (-(self.C-self.f)+self.min_f[None,:] )+self.g[None,:] 
-            M = a_[:,None]*np.exp(exponent/self.epsilon)*np.sqrt(b_)[None,:]
-            self.Hessian = np.sum(M*np.sqrt(b_)[None,:],1)[:,None]*np.identity(self.a.shape[0])-np.dot( M , M.T )   
+            exponent = (-(self.C-self.f[:,None])+self.min_f[None,:] )+self.g[None,:] 
+            M =  self.a[:,None]*np.exp(exponent/self.epsilon)*np.sqrt( self.b)[None,:]
+            S = np.sum(M*np.sqrt(self.b)[None,:],1)
+            self.Hessian = S[:,None]*np.identity(self.a.shape[0])-np.dot( M , M.T )  
             # Compute solution of Ax = b:
             if version == 4:
               print("\n At iteration: ",i)
@@ -774,26 +771,27 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
                                                     debug = debug, 
                                                     optType = optType )
               self.timing.append(temp)
-
-            # Wolfe condition 1( Armijo condition ):
-            slope  = np.dot(p_k.T, grad_f)[0][0]
+            p_k = p_k.reshape(p_k.shape[0],)
+            # Wolfe condition 1: Armijo Condition:  
+            slope = np.dot(p_k, grad_f)
             alpha = 1
-            alpha = self._wolfe1( alpha, p_k, slope )
-            self.alpha_list.append( alpha ) 
+            alpha = self._wolfe1(alpha, p_k, slope)
+            self.alpha_list.append(alpha)
             # Update f and g:
             self.f = self.f + alpha*p_k
-            self.min_f = np.min(self.C-self.f,0)
+            self.min_f = np.min(self.C-self.f[:,None],0)    
             # Updating the new self.g in the similar way as we did before starting the while loop.
-            self.g = -self.epsilon*np.log(np.sum(a_[:,None]*np.exp((self.f-self.C+self.min_f[None,:])/self.epsilon),0))# Shape: (m,)
-            # Error computation:
+            H = -self.C+self.f[:,None]+self.min_f[None,:]
+            self.g = -self.epsilon*np.log( np.sum(self.a[:,None]*np.exp(H/self.epsilon),0) )
             ### Here similar to the Hessian the computation of the coupling P involves addition of the minimum self.min_f completing the log-domian regularization of self.g.
-            exponent = (-(self.C-self.f)+self.min_f[None,:] )+self.g[None,:] 
-            P  =  a_[:,None]*(np.exp(exponent/self.epsilon))*b_[None,:]
-            self.err.append(np.linalg.norm(np.sum(P,1)-a_,1))
+            exponent = (-(self.C-self.f[:,None])+self.min_f[None,:] )+self.g[None,:] 
+            P  =   self.a[:,None]*(np.exp(exponent/self.epsilon))*self.b[None,:]
+            # Error computation:
+            self.err.append(np.linalg.norm(np.sum(P,1)- self.a,1))
             # Calculating objective function:
             value = self._objectivefunction(self.f)
-            self.objvalues.append(value[0])
-            # Check error:
+            self.objvalues.append(value)
+           # Check error:
             if i< maxiter and (self.err[-1]>tol ):
                 i+=1
             else:   
@@ -808,5 +806,3 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
             "linesearch_steps"  : self.alpha_list,
             "timings"           : self.timing,
         }
-
-
