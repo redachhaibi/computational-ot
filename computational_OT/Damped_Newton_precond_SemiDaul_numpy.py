@@ -6,15 +6,15 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
     def __init__(self, C, a, b, f, epsilon, rho, c, null_vector, precond_vectors):
         """
         
-        Arg:
-          C : Cost matrix of size n by m.
-          (a,b) : The two measures of the OT problem, the shape of which is (n,) and (m,) respectively.
-          f : Kantorovich potential f, which is of shape (n,).
-          rho : Damping factor for the line search update step.
-          epsilon : The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
-          c : Damping factor for the slope in the Armijo's condition.
-          null_vector: null vector of the Hessian obtained from the unpreconditioned iteration of semi-dual damped Newton.
-          precond_vector: preconditioning vectors from the selected eigenvalues obtained from the unpreconditioned iteration of semi-dual damped Newton to be used for preconditioning the system <Hessian,p> = gradient, where p is the optimization direction vector.
+        Args:
+          C (matrix: float) : Cost matrix of size n by m.
+          (a,b) (list:float, list:float) : The two measures of the OT problem, the shape of which is (n,) and (m,) respectively.
+          f (list:float): Kantorovich potential f, which is of shape (n,).
+          rho (float) : Damping factor for the line search update step.
+          epsilon (float) : The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
+          c (float) : Damping factor for the slope in the Armijo's condition.
+          null_vector (list:float) : null vector of the Hessian obtained from the unpreconditioned iteration of semi-dual damped Newton.
+          precond_vector (list:float) : preconditioning vectors from the selected eigenvalues obtained from the unpreconditioned iteration of semi-dual damped Newton to be used for preconditioning the system <Hessian,p> = gradient, where p is the optimization direction vector.
         """
         self.C = C
         self.a = a
@@ -31,23 +31,23 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         self.timing = []
         self.out = []
         # Computing minimum of  C-f for each column of this difference matrix.
-        self.min_f = np.min( self.C - self.f[:,None], axis = 0 )# Shape: (m,)
+        self.f_C = np.min( self.C - self.f[:,None], axis = 0 )# The C-transform of f, shape : (m,).
         # We know e^((-(C-f)+self.min_f)/epsilon)<1, therefore the value of self.g below is bounded.
-        self.H = self.C - self.f[:,None] - self.min_f[None,:]# Shape: (n,m)
-        self.g = -self.epsilon*np.log( np.sum( self.a[:,None]*np.exp(-self.H/self.epsilon), axis = 0 ) )# Shape (m,)
-
+        self.H = self.C - self.f[:,None] - self.f_C[None,:] # Shape : (n,m)     
+        self.g = self.f_C -self.epsilon*np.log( np.sum( self.a[:,None]*np.exp( -self.H /self.epsilon ), axis = 0 ) )# Shape : (m,)
+        self.z = self.C - self.f[:,None] - self.g[None,:]# Shape : (n,m)
 
     def _objectivefunction( self, f ):
         """ 
         
         Args:
-          f: The Kantorovich potential f.
-        Returns : Q_semi(f) =  <f,a> + <g(f,C,epsilon),b>.
+          f (list:float) : The Kantorovich potential f.
+        Returns : Q_semi(f) (float) =  <f,a> + <g(f,C,epsilon),b>.
         """
         # Computing minimum of  C-f for each column of this difference matrix.
-        min_f = np.min( self.C - f[:,None], axis = 0 )# Shape: (m,)
-        H = self.C - f[:,None] - min_f[None,:]# Shape: (n,m)
-        g = -self.epsilon*np.log( np.sum( self.a[:,None]*np.exp( -H/self.epsilon ), axis = 0 ) ) + min_f # Shape: (m,)
+        f_C = np.min( self.C - f[:,None], axis = 0 )# The C-transform of f, shape : (m,).
+        H = self.C - f[:,None] - f_C[None,:]# Shape : (n,m)
+        g = f_C - self.epsilon*np.log( np.sum( self.a[:,None]*np.exp( -H /self.epsilon ), axis = 0 ) ) # Shape : (m,)
         Q_semi = np.dot( f, self.a ) + np.dot( g, self.b ) 
         return Q_semi
       
@@ -55,21 +55,20 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         """ 
             Compute gradient with respect to f of the objective function Q_semi(.).
         """
-        z = -self.H + self.g[None,:] # Shape: (n,m)  
-        gradient = self.a - np.sum( self.a[:,None]*np.exp( z/self.epsilon )*self.b[None,:], axis = 1 )# Shape: (n,)
-        return gradient
+        gradient = self.a[:,None]*(np.ones(self.a.shape[0]) - np.sum( np.exp( -self.z/self.epsilon )*self.b[None,:], axis = 1 ))[:,None]# Shape : (n,1)
+        return gradient.reshape(self.a.shape[0],)
 
     def _wolfe1( self, alpha, p, slope ):#Armijo Condition
           """
-          
-            Backtracking
-            Args:
-                alpha : The step size to update the potentials towards the optimal direction.
-                p : The optimal direction.
-                slope : It is the inner product of the gradient and p.
-            Returns:
-              alpha: The updated step size. 
-          """ 
+
+          Args:
+              alpha (float) : The update step size.
+              p (list:float) : The optimal direction.
+              slope (float) : It is the inner product of the gradient and p.
+
+          Returns:
+              alpha (float) : The updated step size.
+          """
           reduction_count = 0           
           while True:   
             condition = self._objectivefunction( self.f + alpha*p )< self._objectivefunction( self.f ) + self.c*alpha*slope
@@ -82,6 +81,20 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
 
           
     def _precond_inversion_v0( self, unnormalized_Hessian, gradient, iterative_inversion = -1, debug = False ):
+        """
+
+          Args:
+              unnormalized_Hessian (matrix:float) : THe unnormalized Hessian, shape : (n,n).
+              gradient (list:float) : The gradient vector, shape : (n,).
+              iterative_inversion (int) : The number of iterative inversions. Defaults to -1.
+              debug (bool) : To add a debug any step of the implementation when needed. Defaults to False.
+              optType (str) : _description_. Defaults to None.
+
+          Returns:
+              p (list:float) : The optimal direction vector.
+              timings (list:float) : The list of timestamps at each step.
+        """
+      
         timings = []  
         start = time.time()
         # Record list of unwinding transformations on final result
@@ -173,6 +186,20 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         return p_k,timings
 
     def _precond_inversion_v1( self, unnormalized_Hessian, gradient, iterative_inversion = -1, debug = False ):
+        """
+
+          Args:
+              unnormalized_Hessian (matrix:float) : THe unnormalized Hessian, shape : (n,n).
+              gradient (list:float) : The gradient vector, shape : (n,).
+              iterative_inversion (int) : The number of iterative inversions. Defaults to -1.
+              debug (bool) : To add a debug any step of the implementation when needed. Defaults to False.
+              optType (str) : _description_. Defaults to None.
+
+          Returns:
+              p (list:float) : The optimal direction vector.
+              timings (list:float) : The list of timestamps at each step.
+        """
+      
         timings = []
         start = time.time()
         # Record list of unwinding transformations on final result
@@ -271,6 +298,20 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         return p_k,timings
 
     def _precond_inversion_v2( self, unnormalized_Hessian, gradient, iterative_inversion = -1, debug = False ):
+        """
+
+          Args:
+              unnormalized_Hessian (matrix:float) : THe unnormalized Hessian, shape : (n,n).
+              gradient (list:float) : The gradient vector, shape : (n,).
+              iterative_inversion (int) : The number of iterative inversions. Defaults to -1.
+              debug (bool) : To add a debug any step of the implementation when needed. Defaults to False.
+              optType (str) : _description_. Defaults to None.
+
+          Returns:
+              p (list:float) : The optimal direction vector.
+              timings (list:float) : The list of timestamps at each step.
+        """
+      
         timings = []
         start = time.time()
         # Record list of unwinding transformations on final result
@@ -395,6 +436,20 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         return p_k,timings
 
     def _precond_inversion_v3( self, unnormalized_Hessian, gradient, iterative_inversion = -1, debug = False, optType = None ):
+        """
+
+          Args:
+              unnormalized_Hessian (matrix:float) : THe unnormalized Hessian, shape : (n,n).
+              gradient (list:float) : The gradient vector, shape : (n,).
+              iterative_inversion (int) : The number of iterative inversions. Defaults to -1.
+              debug (bool) : To add a debug any step of the implementation when needed. Defaults to False.
+              optType (str) : _description_. Defaults to None.
+
+          Returns:
+              p (list:float) : The optimal direction vector.
+              timings (list:float) : The list of timestamps at each step.
+        """
+      
         timings = []
         start = time.time()
         # Record list of unwinding transformations on final result
@@ -488,6 +543,19 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         return p_k, timings
       
     def _precond_inversion_v4( self, unnormalized_Hessian, gradient, iterative_inversion = -1, debug = False, optType = None ):
+        """
+
+          Args:
+              unnormalized_Hessian (matrix:float) : THe unnormalized Hessian, shape : (n,n).
+              gradient (list:float) : The gradient vector, shape : (n,).
+              iterative_inversion (int) : The number of iterative inversions. Defaults to -1.
+              debug (bool) : To add a debug any step of the implementation when needed. Defaults to False.
+              optType (str) : _description_. Defaults to None.
+
+          Returns:
+              p (list:float) : The optimal direction vector.
+              timings (list:float) : The list of timestamps at each step.
+        """
         timings = []
         start = time.time()
         # Record list of unwinding transformations on final result
@@ -594,7 +662,20 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         print("|--- Time taken for the complete code block: ",np.round( interval,2),"ms---|\n")
         return p_k, timings
       
-    def _precond_inversion( self, unnormalized_Hessian, gradient, iterative_inversion = -1, debug = False, optType = None ):        
+    def _precond_inversion( self, unnormalized_Hessian, gradient, iterative_inversion = -1, debug = False, optType = None ):   
+        """
+
+          Args:
+              unnormalized_Hessian (matrix:float) : THe unnormalized Hessian, shape : (n,n).
+              gradient (list:float) : The gradient vector, shape : (n,).
+              iterative_inversion (int) : The number of iterative inversions. Defaults to -1.
+              debug (bool) : To add a debug any step of the implementation when needed. Defaults to False.
+              optType (str) : _description_. Defaults to None.
+
+          Returns:
+              p (list:float) : The optimal direction vector.
+              timings (list:float) : The list of timestamps at each step.
+        """
         timings = []
         start = time.time()
         # Record list of unwinding transformations on final result
@@ -700,32 +781,31 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
     
     def _update(self, tol = 1e-12, maxiter = 100, iterative_inversion = -1, version = 1, debug = False, optType = 'cg'):
         """
-        
+
         Args:
-            tol : The tolerance limit for the error. Defaults to 1e-12.
-            maxiter :  The maximum iteration for the optimization algorithm. Defaults to 100.
-            iterative_inversion : The number of iterative inversions to be used. Defaults to -1.
-            version : The version of the precondioned iterative inversion to be used. Defaults to 1.
-            debug : To add a debug any step of the implementation when needed. Defaults to False.
-            optType : Input for the choice of iterative inversion algorithm, which here are Conjugate Gradient-'cg' and GMRES-'gmres. Defaults to 'cg'.
+            tol (float) : The tolerance limit for the error. Defaults to 1e-12.
+            maxiter (int) : The maximum iteration for the optimization algorithm. Defaults to 100.
+            iterative_inversion (int) : The number of iterative inversions to be used. Defaults to -1.
+            version (int) : The version of the precondioned iterative inversion to be used. Defaults to 1.
+            debug (bool) : To add a debug any step of the implementation when needed. Defaults to False.
+            optType (str) :  Input for the choice of iterative inversion algorithm, which here are Conjugate Gradient-'cg' and GMRES-'gmres. Defaults to 'cg'.
 
         Returns:
-            potential_f : The optimal Kantorovich potential f.
-            potential_g : The optimal Kantorovich potential g.
-            error : The list of error values over the iteration of the algorithm.
-            objectives  : The list of objective function values over the iterations of the algorithm.
-            linesearch_steps : The list of step size along the iterations of the algorithm.
-            timings : The list of timestamps.
+            potential_f (list:float) : The optimal Kantorovich potential f.
+            potential_g (list:float) : The optimal Kantorovich potential g.
+            error (list:float) : The list of error values over the iteration of the algorithm.
+            objectives  (list:float) : The list of objective function values over the iterations of the algorithm.
+            linesearch_steps (list:float) : The list of step size along the iterations of the algorithm.
+            timings (list:float) : The list of timestamps.
         """
         i = 0
         while True: 
             # Compute gradient w.r.t f:
-            grad_f = self._computegradientf()
+            grad_f = self._computegradientf()# Shape : (n,)
             # Compute the Hessian:
-            z = -self.H + self.g[None,:] # Shape: (n,m)
-            M = self.a[:,None]*np.exp( z/self.epsilon )*np.sqrt( self.b )[None,:]# Shape: (n,m)
-            S = np.sum( M*np.sqrt( self.b )[None,:], axis = 1 )# Shape: (n,)
-            self.Hessian = S[:,None]*np.identity( self.a.shape[0] ) - np.dot( M, M.T )  # Shape: (n,n)
+            M = self.a[:,None]*np.exp( -self.z/self.epsilon )*np.sqrt( self.b )[None,:]# Shape : (n,m)
+            Sum_M = np.sum( M*np.sqrt( self.b )[None,:], axis = 1 )# Shape : (n,)
+            self.Hessian = Sum_M[:,None]*np.identity( self.a.shape[0] ) - np.dot( M, M.T )  # Shape : (n,n)
             # Compute solution of Ax = b:
             if version == 4:
               print("\n At iteration: ",i)
@@ -772,7 +852,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
                                                     debug = debug, 
                                                     optType = optType )
               self.timing.append(temp)
-            p_k = p_k.reshape(p_k.shape[0], )
+            p_k = p_k.reshape(p_k.shape[0], )# Shape : (n,)
             # Wolfe condition 1: Armijo Condition:  
             slope = np.dot( p_k, grad_f )
             alpha = 1
@@ -780,11 +860,11 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
             self.alpha_list.append( alpha )
             # Update f and g:
             self.f = self.f + alpha*p_k
-            self.min_f = np.min( self.C - self.f[:,None], axis = 0 )    
-            self.H = self.C - self.f[:,None] - self.min_f[None,:]
-            self.g = -self.epsilon*np.log( np.sum( self.a[:,None]*np.exp( -self.H/self.epsilon ), axis = 0 ) )
-            z = -self.H + self.g[None,:] 
-            P = self.a[:,None]*( np.exp( z/self.epsilon ) )*self.b[None,:]
+            self.f_C = np.min( self.C - self.f[:,None], axis = 0 )# The C-transform of f, shape : (m,). 
+            self.H = self.C - self.f[:,None] - self.f_C[None,:]# Shape : (n,m)
+            self.g = self.f_C - self.epsilon*np.log( np.sum( self.a[:,None]*np.exp( -self.H /self.epsilon ), axis = 0 ) )# Shape : (m,)
+            self.z = self.C - self.f[:,None] - self.g[None,:]# Shape : (n,m)
+            P = self.a[:,None]*( np.exp( -self.z/self.epsilon ) )*self.b[None,:]# Shape : (n,m)
             # Error computation:
             self.err.append( np.linalg.norm( np.sum( P, axis = 1 ) - self.a, ord = 1 ) )
             # Calculating objective function:
@@ -799,7 +879,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         # end for                                                                                                            
         return {
             "potential_f"       : self.f.reshape( self.a.shape[0], ) + self.epsilon*np.log( self.a ).reshape( self.a.shape[0], ),
-            "potential_g"       : self.g.reshape( self.b.shape[0], ) + self.epsilon*np.log( self.b ).reshape( self.b.shape[0], ) + self.min_f,
+            "potential_g"       : self.g.reshape( self.b.shape[0], ) + self.epsilon*np.log( self.b ).reshape( self.b.shape[0], ) ,
             "error"             : self.err,
             "objectives"        : self.objvalues,
             "linesearch_steps"  : self.alpha_list,
