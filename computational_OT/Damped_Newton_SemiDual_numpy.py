@@ -1,16 +1,23 @@
 import numpy as np
+from typing import List, Dict
 
 class DampedNewton_SemiDual_np:
-    def __init__(self, C, a, b, f, epsilon, rho, c):
+    def __init__(self,  C : List[List[float]], 
+                        a : List[float], 
+                        b : List[float],
+                        f : List[float],
+                        epsilon : float,
+                        rho : float,
+                        c : float):
         """
         
         Args:
-            C (matrix: float) : Cost matrix of size n by m.
-            (a,b) (list:float, list:float) : The two measures of the OT problem, the shape of which is (n,) and (m,) respectively.
-            f (list:float) : Kantorovich potential f, which is of shape (n,).
-            rho (float) : Damping factor for the line search update step.
-            epsilon (float) : The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
-            c (float) : Damping factor for the slope in the Armijo's condition.
+            C : Cost matrix of size n by m.
+            ( a, b ) : The two measures of the OT problem, the shape of which is (n,) and (m,) respectively.
+            f : Kantorovich potential f, which is of shape (n,).
+            rho : Damping factor for the line search update step.
+            epsilon : The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
+            c : Damping factor for the slope in the Armijo's condition.
         """
         self.C = C
         self.a = a
@@ -32,12 +39,12 @@ class DampedNewton_SemiDual_np:
         self.g = self.f_C -self.epsilon*np.log( np.sum( self.a[:,None]*np.exp( -self.H /self.epsilon ), axis = 0 ) )# Shape : (m,)
         self.z = self.C - self.f[:,None] - self.g[None,:]# Shape : (n,m)
 
-    def _objectivefunction( self, f ):
+    def _objectivefunction( self, f : List[float] )-> float :
         """ 
         
         Args:
-          f (list:float) : The Kantorovich potential f.
-        Returns : Q_semi(f) (float) =  <f,a> + <g(f,C,epsilon),b>.
+          f : The Kantorovich potential f.
+        Returns : Q_semi(f) =  <f,a> + <g(f,C,epsilon),b>.
         """
         # Computing minimum of  C-f for each column of this difference matrix.
         f_C = np.min( self.C - f[:,None], axis = 0 )# The C-transform of f, shape : (m,).
@@ -46,23 +53,27 @@ class DampedNewton_SemiDual_np:
         Q_semi = np.dot( f, self.a ) + np.dot( g, self.b ) 
         return Q_semi
       
-    def _computegradientf( self ):
+    def _computegradientf( self )->List[float]:
         """ 
             Compute gradient with respect to f of the objective function Q_semi(.).
         """
-        gradient = self.a[:,None]*(np.ones(self.a.shape[0]) - np.sum( np.exp( -self.z/self.epsilon )*self.b[None,:], axis = 1 ))[:,None]# Shape : (n,1)
-        return gradient.reshape(self.a.shape[0],)# Shape : (n,)
+        gradient = self.a*(np.ones(self.a.shape[0]) - np.sum( np.exp( -self.z/self.epsilon )*self.b[None,:], axis = 1 ))# Shape : (n,)
+        return gradient
 
-    def _wolfe1( self, alpha, p, slope ):#Armijo Condition
+    def _wolfe1( self,  alpha : float, 
+                        p : List[float],
+                        slope :float 
+                        )->float:
+        #Armijo Condition
         """
 
         Args:
-            alpha (float) : The update step size.
-            p (list:float) :The optimal direction.
-            slope (float) : It is the inner product of the gradient and p.
+            alpha : The update step size.
+            p :The optimal direction.
+            slope : It is the inner product of the gradient and p.
 
         Returns:
-              alpha (float) : The updated step size.
+            alpha : The updated step size.
         """
         reduction_count = 0           
         while True:   
@@ -74,19 +85,21 @@ class DampedNewton_SemiDual_np:
                 break
         return alpha
         
-    def _update( self, tol = 1e-12, maxiter = 100, debug = False ):
+    def _update( self,  tol : float = 1e-12,
+                        maxiter : int = 100 
+                        )-> Dict[str, List[float]]:
         """
 
         Args:
-            tol (float) : The tolerance limit for the error. Defaults to 1e-12.
-            maxiter (int) : The maximum iteration for the optimization algorithm. Defaults to 100.
-            debug (bool) : To add a debug any step of the implementation when needed. Defaults to False.
+            tol : The tolerance limit for the error. Defaults to 1e-12.
+            maxiter: The maximum iteration for the optimization algorithm. Defaults to 100.
+            debug : To add a debug any step of the implementation when needed. Defaults to False.
         Returns:
-            potential_f (list:float) : The optimal Kantorovich potential f.
-            potential_g (list:float) : The optimal Kantorovich potential g.
-            error (list:float) : The list of error values over the iteration of the algorithm.
-            objectives  (list:float) : The list of objective function values over the iterations of the algorithm.
-            linesearch_steps (list:float) : The list of step size along the iterations of the algorithm.
+            potential_f : The optimal Kantorovich potential f.
+            potential_g : The optimal Kantorovich potential g.
+            error : The list of error values over the iteration of the algorithm.
+            objectives : The list of objective function values over the iterations of the algorithm.
+            linesearch_steps : The list of step size along the iterations of the algorithm.
         """
         i = 0
         while True: 
@@ -102,7 +115,7 @@ class DampedNewton_SemiDual_np:
             self.Hessian = -self.Hessian/self.epsilon
             # Compute solution of Ax = b:
             try:    
-                p_k = -np.linalg.solve( self.Hessian, grad_f )
+                p_k = -np.linalg.solve( self.Hessian, grad_f )  
             except:
                 print( "Inverse does not exist at epsilon:", self.epsilon )   
                 return np.zeros(5)

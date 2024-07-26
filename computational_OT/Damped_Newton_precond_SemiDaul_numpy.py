@@ -1,20 +1,29 @@
 import numpy as np
 import scipy
 import time
+from typing import List, Dict, Tuple
 
 class DampedNewton_with_precodonditioner_SemiDual_np:
-    def __init__(self, C, a, b, f, epsilon, rho, c, null_vector, precond_vectors):
+    def __init__(self,  C : List[List[float]],
+                        a : List[float], 
+                        b : List[float], 
+                        f : List[float],
+                        epsilon : float, 
+                        rho : float, 
+                        c : float, 
+                        null_vector : List[float],
+                        precond_vectors : List[float]):
         """
         
         Args:
-          C (matrix: float) : Cost matrix of size n by m.
-          (a,b) (list:float, list:float) : The two measures of the OT problem, the shape of which is (n,) and (m,) respectively.
-          f (list:float): Kantorovich potential f, which is of shape (n,).
-          rho (float) : Damping factor for the line search update step.
-          epsilon (float) : The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
-          c (float) : Damping factor for the slope in the Armijo's condition.
-          null_vector (list:float) : null vector of the Hessian obtained from the unpreconditioned iteration of semi-dual damped Newton.
-          precond_vector (list:float) : preconditioning vectors from the selected eigenvalues obtained from the unpreconditioned iteration of semi-dual damped Newton to be used for preconditioning the system <Hessian,p> = gradient, where p is the optimization direction vector.
+          C : Cost matrix of size n by m.
+          ( a, b ) : The two measures of the OT problem, the shape of which is (n,) and (m,) respectively.
+          f: Kantorovich potential f, which is of shape (n,).
+          rho : Damping factor for the line search update step.
+          epsilon : The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
+          c : Damping factor for the slope in the Armijo's condition.
+          null_vector : null vector of the Hessian obtained from the unpreconditioned iteration of semi-dual damped Newton.
+          precond_vector : preconditioning vectors from the selected eigenvalues obtained from the unpreconditioned iteration of semi-dual damped Newton to be used for preconditioning the system <Hessian,p> = gradient, where p is the optimization direction vector.
         """
         self.C = C
         self.a = a
@@ -37,12 +46,12 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         self.g = self.f_C -self.epsilon*np.log( np.sum( self.a[:,None]*np.exp( -self.H /self.epsilon ), axis = 0 ) )# Shape : (m,)
         self.z = self.C - self.f[:,None] - self.g[None,:]# Shape : (n,m)
 
-    def _objectivefunction( self, f ):
+    def _objectivefunction( self, f : List[float] )-> float :
         """ 
         
         Args:
-          f (list:float) : The Kantorovich potential f.
-        Returns : Q_semi(f) (float) =  <f,a> + <g(f,C,epsilon),b>.
+          f : The Kantorovich potential f.
+        Returns : Q_semi(f) =  <f,a> + <g(f,C,epsilon),b>.
         """
         # Computing minimum of  C-f for each column of this difference matrix.
         f_C = np.min( self.C - f[:,None], axis = 0 )# The C-transform of f, shape : (m,).
@@ -51,48 +60,56 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         Q_semi = np.dot( f, self.a ) + np.dot( g, self.b ) 
         return Q_semi
       
-    def _computegradientf( self ):
+    def _computegradientf( self )->List[float]:
         """ 
             Compute gradient with respect to f of the objective function Q_semi(.).
         """
-        gradient = self.a[:,None]*(np.ones(self.a.shape[0]) - np.sum( np.exp( -self.z/self.epsilon )*self.b[None,:], axis = 1 ))[:,None]# Shape : (n,1)
-        return gradient.reshape(self.a.shape[0],)
+        gradient = self.a*(np.ones(self.a.shape[0]) - np.sum( np.exp( -self.z/self.epsilon )*self.b[None,:], axis = 1 ))# Shape : (n,)
+        return gradient
 
-    def _wolfe1( self, alpha, p, slope ):#Armijo Condition
-          """
+    def _wolfe1( self,  alpha : float, 
+                        p : List[float], 
+                        slope :float 
+                        )->float:
+        #Armijo Condition
+        """
 
-          Args:
-              alpha (float) : The update step size.
-              p (list:float) : The optimal direction.
-              slope (float) : It is the inner product of the gradient and p.
+        Args:
+            alpha : The update step size.
+            p :The optimal direction.
+            slope : It is the inner product of the gradient and p.
 
-          Returns:
-              alpha (float) : The updated step size.
-          """
-          reduction_count = 0           
-          while True:   
+        Returns:
+            alpha : The updated step size.
+        """
+        reduction_count = 0           
+        while True:   
             condition = self._objectivefunction( self.f + alpha*p )< self._objectivefunction( self.f ) + self.c*alpha*slope
             if condition or np.isnan(self._objectivefunction( self.f + alpha*p )):
-              alpha = self.rho*alpha                                                     
-              reduction_count += 1
+                alpha = self.rho*alpha                                                     
+                reduction_count += 1
             else:
-              break
-          return alpha
-
+                break
+        return alpha
+        
           
-    def _precond_inversion_v0( self, unnormalized_Hessian, gradient, iterative_inversion = -1, debug = False ):
+    def _precond_inversion_v0( self,  unnormalized_Hessian : List[List[float]], 
+                                      gradient : List[float],
+                                      iterative_inversion : int = -1, 
+                                      debug : bool = False 
+                                      )-> Tuple[ List[float], List[float] ]:
         """
 
           Args:
-              unnormalized_Hessian (matrix:float) : THe unnormalized Hessian, shape : (n,n).
-              gradient (list:float) : The gradient vector, shape : (n,).
-              iterative_inversion (int) : The number of iterative inversions. Defaults to -1.
-              debug (bool) : To add a debug any step of the implementation when needed. Defaults to False.
-              optType (str) : _description_. Defaults to None.
+              unnormalized_Hessian : THe unnormalized Hessian, shape : (n,n).
+              gradient : The gradient vector, shape : (n,).
+              iterative_inversion : The number of iterative inversions. Defaults to -1.
+              debug : To add a debug any step of the implementation when needed. Defaults to False.
+              optType :  Input for the choice of iterative inversion algorithm, which here are Conjugate Gradient-'cg' and GMRES-'gmres. Defaults to 'cg'.
 
           Returns:
-              p (list:float) : The optimal direction vector.
-              timings (list:float) : The list of timestamps at each step.
+              p : The optimal direction vector.
+              timings : The list of timestamps at each step.
         """
       
         timings = []  
@@ -185,20 +202,25 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         print( "|--- Time taken for the complete code block: ",np.round( interval,2),"ms---|\n" )
         return p_k,timings
 
-    def _precond_inversion_v1( self, unnormalized_Hessian, gradient, iterative_inversion = -1, debug = False ):
+    def _precond_inversion_v1( self,  unnormalized_Hessian : List[List[float]], 
+                                      gradient : List[float],
+                                      iterative_inversion : int = -1, 
+                                      debug : bool = False 
+                                      )-> Tuple[ List[float], List[float] ]:
         """
 
           Args:
-              unnormalized_Hessian (matrix:float) : THe unnormalized Hessian, shape : (n,n).
-              gradient (list:float) : The gradient vector, shape : (n,).
-              iterative_inversion (int) : The number of iterative inversions. Defaults to -1.
-              debug (bool) : To add a debug any step of the implementation when needed. Defaults to False.
-              optType (str) : _description_. Defaults to None.
+              unnormalized_Hessian : THe unnormalized Hessian, shape : (n,n).
+              gradient : The gradient vector, shape : (n,).
+              iterative_inversion : The number of iterative inversions. Defaults to -1.
+              debug : To add a debug any step of the implementation when needed. Defaults to False.
+              optType :  Input for the choice of iterative inversion algorithm, which here are Conjugate Gradient-'cg' and GMRES-'gmres. Defaults to 'cg'.
 
           Returns:
-              p (list:float) : The optimal direction vector.
-              timings (list:float) : The list of timestamps at each step.
+              p : The optimal direction vector.
+              timings : The list of timestamps at each step.
         """
+      
       
         timings = []
         start = time.time()
@@ -297,20 +319,25 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         print( "|--- Time taken for the complete code block: ",np.round( interval,2 ),"ms---|\n" )
         return p_k,timings
 
-    def _precond_inversion_v2( self, unnormalized_Hessian, gradient, iterative_inversion = -1, debug = False ):
+    def _precond_inversion_v2( self,  unnormalized_Hessian : List[List[float]], 
+                                      gradient : List[float], 
+                                      iterative_inversion : int = -1, 
+                                      debug : bool = False 
+                                      )-> Tuple[ List[float], List[float] ]:
         """
 
           Args:
-              unnormalized_Hessian (matrix:float) : THe unnormalized Hessian, shape : (n,n).
-              gradient (list:float) : The gradient vector, shape : (n,).
-              iterative_inversion (int) : The number of iterative inversions. Defaults to -1.
-              debug (bool) : To add a debug any step of the implementation when needed. Defaults to False.
-              optType (str) : _description_. Defaults to None.
+              unnormalized_Hessian : THe unnormalized Hessian, shape : (n,n).
+              gradient : The gradient vector, shape : (n,).
+              iterative_inversion : The number of iterative inversions. Defaults to -1.
+              debug : To add a debug any step of the implementation when needed. Defaults to False.
+              optType :  Input for the choice of iterative inversion algorithm, which here are Conjugate Gradient-'cg' and GMRES-'gmres. Defaults to 'cg'.
 
           Returns:
-              p (list:float) : The optimal direction vector.
-              timings (list:float) : The list of timestamps at each step.
+              p : The optimal direction vector.
+              timings : The list of timestamps at each step.
         """
+      
       
         timings = []
         start = time.time()
@@ -435,19 +462,23 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         print( "|--- Time taken for the complete code block: ",np.round( interval ,2),"ms---|\n" ) 
         return p_k,timings
 
-    def _precond_inversion_v3( self, unnormalized_Hessian, gradient, iterative_inversion = -1, debug = False, optType = None ):
+    def _precond_inversion_v3( self,  unnormalized_Hessian : List[List[float]], 
+                                      gradient : List[float],
+                                      iterative_inversion : int = -1, 
+                                      optType : str = None 
+                                      )-> Tuple[ List[float], List[float] ]:
         """
 
           Args:
-              unnormalized_Hessian (matrix:float) : THe unnormalized Hessian, shape : (n,n).
-              gradient (list:float) : The gradient vector, shape : (n,).
-              iterative_inversion (int) : The number of iterative inversions. Defaults to -1.
-              debug (bool) : To add a debug any step of the implementation when needed. Defaults to False.
-              optType (str) : _description_. Defaults to None.
+              unnormalized_Hessian : THe unnormalized Hessian, shape : (n,n).
+              gradient : The gradient vector, shape : (n,).
+              iterative_inversion : The number of iterative inversions. Defaults to -1.
+              debug : To add a debug any step of the implementation when needed. Defaults to False.
+              optType :  Input for the choice of iterative inversion algorithm, which here are Conjugate Gradient-'cg' and GMRES-'gmres. Defaults to 'cg'.
 
           Returns:
-              p (list:float) : The optimal direction vector.
-              timings (list:float) : The list of timestamps at each step.
+              p : The optimal direction vector.
+              timings : The list of timestamps at each step.
         """
       
         timings = []
@@ -542,19 +573,23 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         print("|--- Time taken for the complete code block: ",np.round( interval,2),"ms---|\n")
         return p_k, timings
       
-    def _precond_inversion_v4( self, unnormalized_Hessian, gradient, iterative_inversion = -1, debug = False, optType = None ):
+    def _precond_inversion_v4( self,  unnormalized_Hessian : List[List[float]], 
+                                      gradient : List[float],
+                                      iterative_inversion : int = -1, 
+                                      optType : str = None 
+                                      )-> Tuple[ List[float], List[float] ]:
         """
 
           Args:
-              unnormalized_Hessian (matrix:float) : THe unnormalized Hessian, shape : (n,n).
-              gradient (list:float) : The gradient vector, shape : (n,).
-              iterative_inversion (int) : The number of iterative inversions. Defaults to -1.
-              debug (bool) : To add a debug any step of the implementation when needed. Defaults to False.
-              optType (str) : _description_. Defaults to None.
+              unnormalized_Hessian : THe unnormalized Hessian, shape : (n,n).
+              gradient : The gradient vector, shape : (n,).
+              iterative_inversion : The number of iterative inversions. Defaults to -1.
+              debug : To add a debug any step of the implementation when needed. Defaults to False.
+              optType :  Input for the choice of iterative inversion algorithm, which here are Conjugate Gradient-'cg' and GMRES-'gmres. Defaults to 'cg'.
 
           Returns:
-              p (list:float) : The optimal direction vector.
-              timings (list:float) : The list of timestamps at each step.
+              p : The optimal direction vector.
+              timings : The list of timestamps at each step.
         """
         timings = []
         start = time.time()
@@ -662,19 +697,23 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         print("|--- Time taken for the complete code block: ",np.round( interval,2),"ms---|\n")
         return p_k, timings
       
-    def _precond_inversion( self, unnormalized_Hessian, gradient, iterative_inversion = -1, debug = False, optType = None ):   
+    def _precond_inversion( self, unnormalized_Hessian : List[List[float]], 
+                                  gradient : List[float],
+                                  iterative_inversion : int = -1, 
+                                  optType : str = None 
+                                  )-> Tuple[ List[float], List[float] ]:
         """
 
           Args:
-              unnormalized_Hessian (matrix:float) : THe unnormalized Hessian, shape : (n,n).
-              gradient (list:float) : The gradient vector, shape : (n,).
-              iterative_inversion (int) : The number of iterative inversions. Defaults to -1.
-              debug (bool) : To add a debug any step of the implementation when needed. Defaults to False.
-              optType (str) : _description_. Defaults to None.
+              unnormalized_Hessian : THe unnormalized Hessian, shape : (n,n).
+              gradient : The gradient vector, shape : (n,).
+              iterative_inversion : The number of iterative inversions. Defaults to -1.
+              debug : To add a debug any step of the implementation when needed. Defaults to False.
+              optType :  Input for the choice of iterative inversion algorithm, which here are Conjugate Gradient-'cg' and GMRES-'gmres. Defaults to 'cg'.
 
           Returns:
-              p (list:float) : The optimal direction vector.
-              timings (list:float) : The list of timestamps at each step.
+              p : The optimal direction vector.
+              timings : The list of timestamps at each step.
         """
         timings = []
         start = time.time()
@@ -779,24 +818,30 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         # print("|--- Time taken for the complete code block: ",np.round( interval,2),"ms---|\n")
         return p_k, timings
     
-    def _update(self, tol = 1e-12, maxiter = 100, iterative_inversion = -1, version = 1, debug = False, optType = 'cg'):
+    def _update(self, tol : float = 1e-12, 
+                      maxiter : int = 100, 
+                      iterative_inversion : int = -1, 
+                      version : int = 1, 
+                      debug : bool = False, 
+                      optType : str = 'cg'
+                      )-> Dict[str, List[float]]:
         """
 
         Args:
-            tol (float) : The tolerance limit for the error. Defaults to 1e-12.
-            maxiter (int) : The maximum iteration for the optimization algorithm. Defaults to 100.
-            iterative_inversion (int) : The number of iterative inversions to be used. Defaults to -1.
-            version (int) : The version of the precondioned iterative inversion to be used. Defaults to 1.
-            debug (bool) : To add a debug any step of the implementation when needed. Defaults to False.
-            optType (str) :  Input for the choice of iterative inversion algorithm, which here are Conjugate Gradient-'cg' and GMRES-'gmres. Defaults to 'cg'.
+            tol : The tolerance limit for the error. Defaults to 1e-12.
+            maxiter : The maximum iteration for the optimization algorithm. Defaults to 100.
+            iterative_inversion : The number of iterative inversions to be used. Defaults to -1.
+            version: The version of the precondioned iterative inversion to be used. Defaults to 1.
+            debug : To add a debug any step of the implementation when needed. Defaults to False.
+            optType :  Input for the choice of iterative inversion algorithm, which here are Conjugate Gradient-'cg' and GMRES-'gmres. Defaults to 'cg'.
 
         Returns:
-            potential_f (list:float) : The optimal Kantorovich potential f.
-            potential_g (list:float) : The optimal Kantorovich potential g.
-            error (list:float) : The list of error values over the iteration of the algorithm.
-            objectives  (list:float) : The list of objective function values over the iterations of the algorithm.
-            linesearch_steps (list:float) : The list of step size along the iterations of the algorithm.
-            timings (list:float) : The list of timestamps.
+            potential_f : The optimal Kantorovich potential f.
+            potential_g : The optimal Kantorovich potential g.
+            error : The list of error values over the iteration of the algorithm.
+            objectives : The list of objective function values over the iterations of the algorithm.
+            linesearch_steps : The list of step size along the iterations of the algorithm.
+            timings : The list of timestamps.
         """
         i = 0
         while True: 
@@ -812,7 +857,6 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
               p_k, temp = self._precond_inversion_v4( self.Hessian, 
                                                       grad_f, 
                                                       iterative_inversion = iterative_inversion, 
-                                                      debug = debug, 
                                                       optType = optType )
               self.timing.append(temp)
             elif version == 3:
@@ -820,7 +864,6 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
               p_k, temp = self._precond_inversion_v3( self.Hessian, 
                                                       grad_f, 
                                                       iterative_inversion = iterative_inversion, 
-                                                      debug = debug, 
                                                       optType = optType )
               self.timing.append(temp)
             elif version == 2:
@@ -849,7 +892,6 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
               p_k, temp = self._precond_inversion(  self.Hessian, 
                                                     grad_f, 
                                                     iterative_inversion = iterative_inversion, 
-                                                    debug = debug, 
                                                     optType = optType )
               self.timing.append(temp)
             p_k = p_k.reshape(p_k.shape[0], )# Shape : (n,)
