@@ -62,14 +62,14 @@ class DampedNewton_SemiDual_np:
 
     def _wolfe1( self,  alpha : float, 
                         p : List[float],
-                        slope :float 
+                        slope : float 
                         )->float:
         #Armijo Condition
         """
 
         Args:
             alpha : The update step size.
-            p :The optimal direction.
+            p : The optimal direction.
             slope : It is the inner product of the gradient and p.
 
         Returns:
@@ -93,7 +93,6 @@ class DampedNewton_SemiDual_np:
         Args:
             tol : The tolerance limit for the error. Defaults to 1e-12.
             maxiter: The maximum iteration for the optimization algorithm. Defaults to 100.
-            debug : To add a debug any step of the implementation when needed. Defaults to False.
         Returns:
             potential_f : The optimal Kantorovich potential f.
             potential_g : The optimal Kantorovich potential g.
