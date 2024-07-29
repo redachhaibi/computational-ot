@@ -23,6 +23,10 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
                       The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
             c : float
                 Damping factor for the slope in the Armijo's condition.
+            null_vector : ndaray, shape (n,)
+                          The null vector of the Hessian as in the semi-dual damped Newton without preconditioning.
+            precond_vectors : ndaray, shape (n,)
+                              The preconditioning vectors obtained from semi-dual damped Newton without preconditioning.
         """
         self.C = C
         self.a = a
@@ -866,7 +870,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         Returns:
         --------
         Returns a dictionary where the keys are strings and the values are ndarrays.
-        The following are the keys of the dictionary and their corresponding values and descriptions:
+        The following are the keys of the dictionary and the descriptions of their values:
             potential_f : ndarray, shape (n,)
                           The optimal Kantorovich potential f.
             potential_g : ndarray, shape (m,)

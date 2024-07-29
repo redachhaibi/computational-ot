@@ -109,7 +109,7 @@ class DampedNewton_SemiDual_np:
         Returns:
         --------
         Returns a dictionary where the keys are strings and the values are ndarrays.
-        The following are the keys of the dictionary and their corresponding values and descriptions:
+        The following are the keys of the dictionary and the descriptions of their values:
             potential_f : ndarray, shape (n,)
                           The optimal Kantorovich potential f.
             potential_g : ndarray, shape (m,)
