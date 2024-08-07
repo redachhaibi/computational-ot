@@ -10,13 +10,13 @@ class Gradient_Ascent:
     -----------
         K : ndarray, shape (n,m)
             The Gibb's kernel of size n by m.
-        a : ndarray, shape (n,1)
+        a : ndarray, shape (n,)
             The probability histogram of the sample of size n.
-        b : ndarray, shape (m,1)
+        b : ndarray, shape (m,)
             The probability histogram of the sample of size m.
-        f : ndarray, shape (n,1) 
+        f : ndarray, shape (n,) 
             The initial Kantorovich potential f.
-        g : ndarray, shape (m,1) 
+        g : ndarray, shape (m,) 
             The initial Kantorovich potential g.
         epsilon : float
                   The regularization factor in the entropy regularized optimization setup of the optimal transport problem.

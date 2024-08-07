@@ -339,7 +339,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         print( "|--- Time taken for the complete code block: ", np.round( interval, 2 ), "ms---|\n" )
         return p_k, timings
 
-    def _precond_inversion_v2( self,  unnormalized_Hessian, gradient, iterative_inversion, debug ):
+    def _precond_inversion_v2( self, unnormalized_Hessian, gradient, iterative_inversion, debug ):
         """
 
         Parameters:
@@ -386,7 +386,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         end = time.time()
         interval = 1e3 * ( end - start )
         timings.append( interval )
-        print( "\n|--- Time required for initial preconditioning: ", np.round( interval ,5 ), "ms---|" )
+        print( "\n|--- Time required for initial preconditioning: ", np.round( interval, 5 ), "ms---|" )
 
 
         # Conditioning with other vectors
@@ -398,7 +398,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         y = np.array( self.precond_vectors ).T # Matrix of size n by k
         # Compute eigenvalues
         Ay = np.dot( matrix, y )
-        eigenvalues = np.sum( y * Ay, axis=0 )
+        eigenvalues = np.sum( y * Ay, axis = 0 )
         # Compute P_matrix = id + y*diag(values)*y.T
         values = ( ( 1/np.sqrt(eigenvalues) ) - 1 )    # Vector of size k
         z = y * values[None,:]
@@ -429,9 +429,9 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         matrix = matrix + B + B.T + C
         gradient = np.dot( P_matrix, gradient )
         end = time.time()
-        interval = 1e3 * ( end-start2 )
+        interval = 1e3 * ( end - start2 )
         timings.append( interval )
-        print( "|--- Time required for changing A to PAP: ", np.round( interval , 5 ), "ms---|" )
+        print( "|--- Time required for changing A to PAP: ", np.round( interval, 5 ), "ms---|" )
 
         start3 = time.time()
         # Debug

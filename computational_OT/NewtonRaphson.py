@@ -7,13 +7,13 @@ class NewtonRaphson:
 
         Parameters:
         -----------
-            x : ndarray, (n+m,1)
+            x : ndarray, (n+m,)
                 The vector containing  u =exp(f/epsilon) and v = exp(g/epsilon), where f and g are Kantorovich potentials.    
             K : ndarray, shape (n,m)
                 The Gibb's kernel.
-            a : ndarray, shape (n,1)
+            a : ndarray, shape (n,)
                 The probability histogram of the sample of size n.
-            b : ndarray, shape (m,1)
+            b : ndarray, shape (m,)
                 The probability histogram of the sample of size m.
             epsilon : float
                       The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
@@ -148,11 +148,11 @@ class NewtonRaphson:
             self.err_a.append( e[0] )
             self.err_b.append( e[1] )
 
-            iter_condition = ( e[0]>tol or e[1]>tol )
+            iter_condition = ( e[0] > tol or e[1] > tol )
             if iter_condition and i < maxiter:
                 i += 1
             else:
-                print( "Terminating after iteration: ",i )
+                print( "Terminating after iteration: ", i )
                 break 
         return {
             'error_a' : self.err_a,

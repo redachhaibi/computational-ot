@@ -12,11 +12,11 @@ class DampedNewton_With_Preconditioner:
             C : ndarray, shape (n,m), 
                 n and m are the sizes of the samples from the two point clouds.
                 It is the cost matrix between the sample points of the two point clouds.
-            a : ndarray, shape (n,1)
+            a : ndarray, shape (n,)
                 The probability histogram of the sample of size n.
-            b : ndarray, shape (m,1)
+            b : ndarray, shape (m,)
                 The probability histogram of the sample of size m.
-            f : ndarray, shape (n,1) 
+            f : ndarray, shape (n,) 
                 The initial Kantorovich potential f.
             rho : float
                   Damping factor for the line search update step.
@@ -24,9 +24,9 @@ class DampedNewton_With_Preconditioner:
                       The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
             c : float
                 Damping factor for the slope in the Armijo's condition.
-            null_vector : ndaray, shape (n,1)
+            null_vector : ndaray, shape (n,)
                           The null vector of the Hessian as in the semi-dual damped Newton without preconditioning.
-            precond_vectors : ndaray, shape (n,1)
+            precond_vectors : list of ndarays, shape (n,)
                               The preconditioning vectors obtained from semi-dual damped Newton without preconditioning.
                               
         """
@@ -34,7 +34,7 @@ class DampedNewton_With_Preconditioner:
         self.a = a
         self.b = b
         self.epsilon = epsilon
-        self.x = np.vstack( ( f, g ) )
+        self.x = np.concatenate( ( f, g ), axis = None )
         self.rho = rho           
         self.c = c
         self.null_vector = null_vector
@@ -60,7 +60,7 @@ class DampedNewton_With_Preconditioner:
         """
         u = np.exp( f/self.epsilon )
         v = np.exp( self.x[self.a.shape[0]:]/self.epsilon )
-        return self.a - ( u * np.dot( self.K, v ) ).reshape( f.shape[0],-1 )
+        return self.a - ( u * np.dot( self.K, v ) )
 
  
       def _computegradientg( self, g ):
@@ -75,7 +75,7 @@ class DampedNewton_With_Preconditioner:
         """
         u = np.exp( self.x[:self.a.shape[0]]/self.epsilon )
         v = np.exp( g/self.epsilon )
-        return self.b - ( v * np.dot( self.K.T, u ) ).reshape( g.shape[0], -1 )
+        return self.b - ( v * np.dot( self.K.T, u ) )
 
       def _objectivefunction( self, x ):
         """
@@ -96,7 +96,7 @@ class DampedNewton_With_Preconditioner:
         f = x[:self.a.shape[0]]
         g = x[self.a.shape[0]:]
         regularizer = - self.epsilon * np.dot( np.exp( f/self.epsilon ).T, np.dot( self.K, np.exp( g/self.epsilon ) ) )
-        return np.dot( f.T, self.a ) + np.dot( g.T, self.b ) + regularizer
+        return np.dot( f, self.a ) + np.dot( g, self.b ) + regularizer
 
       def _wolfe1( self, alpha, p, slope ):
         #Armijo Condition
@@ -142,7 +142,7 @@ class DampedNewton_With_Preconditioner:
         -----------
             unnormalized_Hessian :  ndarray, shape (n,m)
                                     The unnormalized Hessian.
-            gradient :  ndarray, shape (n+m,1)
+            gradient :  ndarray, shape (n+m,)
                         The gradient vector.
             iterative_inversion : float
                                   The number of iterative inversions. Defaults to -1.
@@ -177,7 +177,7 @@ class DampedNewton_With_Preconditioner:
         vector = vector.reshape( ( len(vector), 1 ) )
         matrix = matrix + np.dot( vector, vector.T )
         # Transformations
-        gradient = diag[:,None] * gradient
+        gradient = diag[:,None] * gradient[:,None]
         unwinding_transformations.append( [ diag, lambda d, x : d[:,None] * x ] )
 
         # Conditioning with other vectors
@@ -256,7 +256,7 @@ class DampedNewton_With_Preconditioner:
         -----------
             unnormalized_Hessian :  ndarray, shape (n,m)
                                     The unnormalized Hessian.
-            gradient :  ndarray, shape (n+m,1)
+            gradient :  ndarray, shape (n+m,)
                         The gradient vector.
             iterative_inversion : float
                                   The number of iterative inversions. Defaults to -1.
@@ -291,7 +291,7 @@ class DampedNewton_With_Preconditioner:
         vector = vector.reshape( ( len( vector ), 1 ) )
         matrix = matrix + np.dot( vector, vector.T )
         # Transformations
-        gradient = diag[:,None] * gradient
+        gradient = diag[:,None] * gradient[:,None]
         unwinding_transformations.append( [ diag, lambda d, x : d[:,None] * x ] )
         end = time.time()
         interval = 1e3 * ( end-start )
@@ -376,7 +376,7 @@ class DampedNewton_With_Preconditioner:
         -----------
             unnormalized_Hessian :  ndarray, shape (n,m)
                                     The unnormalized Hessian.
-            gradient :  ndarray, shape (n+m,1)
+            gradient :  ndarray, shape (n+m,)
                         The gradient vector.
             iterative_inversion : float
                                   The number of iterative inversions. Defaults to -1.
@@ -410,7 +410,7 @@ class DampedNewton_With_Preconditioner:
         vector = vector.reshape( ( len( vector ), 1 ) )
         matrix = matrix + np.dot( vector, vector.T )
         # Transformations
-        gradient = diag[:,None] * gradient
+        gradient = diag[:,None] * gradient[:,None]
         unwinding_transformations.append( [ diag, lambda d,x : d[:,None] * x ] )
         end = time.time()
         interval = 1e3 * ( end - start )
@@ -521,7 +521,7 @@ class DampedNewton_With_Preconditioner:
         -----------
             unnormalized_Hessian :  ndarray, shape (n,m)
                                     The unnormalized Hessian.
-            gradient :  ndarray, shape (n+m,1)
+            gradient :  ndarray, shape (n+m,)
                         The gradient vector.
             iterative_inversion : float
                                   The number of iterative inversions. Defaults to -1.
@@ -555,7 +555,7 @@ class DampedNewton_With_Preconditioner:
         vector = vector.reshape( ( len( vector ), 1 ) )
         matrix = matrix + np.dot( vector, vector.T )
         # Transformations
-        gradient = diag[:,None] * gradient
+        gradient = diag[:,None] * gradient[:,None]
         unwinding_transformations.append( [ diag, lambda d, x : d[:,None] * x ])
         # Record timing
         end = time.time()
@@ -628,7 +628,7 @@ class DampedNewton_With_Preconditioner:
           P, f = transform
           p_k = f(P, p_k)
         end = time.time()
-        interval = 1e3 * (end - start4 )
+        interval = 1e3 * ( end - start4 )
         timings.append( interval )
         print("|--- Time taken for unwinding: ", np.round( interval , 5 ), "ms---|")
         interval = 1e3 * ( end - start )
@@ -644,7 +644,7 @@ class DampedNewton_With_Preconditioner:
         -----------
             unnormalized_Hessian :  ndarray, shape (n,m)
                                     The unnormalized Hessian.
-            gradient :  ndarray, shape (n+m,1)
+            gradient :  ndarray, shape (n+m,)
                         The gradient vector.
             iterative_inversion : float
                                   The number of iterative inversions. Defaults to -1.
@@ -678,7 +678,7 @@ class DampedNewton_With_Preconditioner:
         vector = vector/np.linalg.norm( vector )
         vector_E = vector
         # Transformations (Initial on gradient and final on result)
-        gradient = diag[:,None] * gradient
+        gradient = diag[:,None] * gradient[:,None]
         unwinding_transformations.append( lambda x : diag[:,None] * x )
         # Record timing
         end = time.time()
@@ -776,7 +776,7 @@ class DampedNewton_With_Preconditioner:
         -----------
             unnormalized_Hessian :  ndarray, shape (n,m)
                                     The unnormalized Hessian.
-            gradient :  ndarray, shape (n+m,1)
+            gradient :  ndarray, shape (n+m,)
                         The gradient vector.
             iterative_inversion : float
                                   The number of iterative inversions. Defaults to -1.
@@ -815,7 +815,7 @@ class DampedNewton_With_Preconditioner:
           vector = vector.reshape( ( len(vector), 1 ) )
           matrix = matrix + np.dot( vector, vector.T )
         # Transformations (Initial on gradient and final on result)
-        gradient = diag[:,None] * gradient
+        gradient = diag[:,None] * gradient[:,None]
         unwinding_transformations.append( lambda x : diag[:,None] * x )
         # Record timing
         end = time.time()
@@ -904,6 +904,7 @@ class DampedNewton_With_Preconditioner:
         timings.append( interval )
         # print("|--- Time taken for the complete code block: ",np.round( interval,2),"ms---|\n")
         return p_k, timings
+     
       
 
       def _update(self, tol = 1e-11, maxiter = 100, iterative_inversion = - 1, version = 1, debug = False, optType = 'cg'):
@@ -948,20 +949,20 @@ class DampedNewton_With_Preconditioner:
             # Compute gradient    
             grad_f = self._computegradientf(self.x[:self.a.shape[0]])
             grad_g = self._computegradientg(self.x[self.a.shape[0]:])
-            gradient = np.vstack( ( grad_f, grad_g ) )
+            gradient = np.concatenate( ( grad_f, grad_g ), axis = None )
             
             # Compute Hessian
-            u = np.exp(self.x[:self.a.shape[0]]/self.epsilon)
-            v = np.exp(self.x[self.a.shape[0]:]/self.epsilon)
+            u = np.exp( self.x[:self.a.shape[0]]/self.epsilon )
+            v = np.exp( self.x[self.a.shape[0]:]/self.epsilon )
             r1 = u * np.dot( self.K, v ) 
             r2 = v * np.dot( self.K.T, u ) 
             u = u.reshape( u.shape[0], )
             v = v.reshape( v.shape[0], )
             P = u[:,None] * self.K * v[None,:]
-            A = np.diag( np.array(r1.reshape( r1.shape[0], ) ) )
+            A = np.diag( np.array( r1.reshape( r1.shape[0], ) ) )
             B = P
             C = P.T
-            D = np.diag( np.array(r2.reshape( r2.shape[0], ) ) )
+            D = np.diag( np.array( r2.reshape( r2.shape[0], ) ) )
             result = np.vstack( ( np.hstack(( A, B )), np.hstack(( C, D )) ) )
                           
                     
@@ -1024,10 +1025,10 @@ class DampedNewton_With_Preconditioner:
             #   print("Inverse does not exist at epsilon:",self.epsilon)
             #   return np.zeros(6)
            # Stacked
-            p_k_stacked = np.vstack( ( p_k[:self.a.shape[0]], p_k[self.a.shape[0]:] ) )
+            p_k_stacked = np.concatenate( ( p_k[:self.a.shape[0]], p_k[self.a.shape[0]:] ), axis = None )
             start = time.time()
             # Wolfe Condition 1: Armijo Condition  
-            slope = np.dot( p_k.T, gradient )[0][0]
+            slope = np.dot( p_k.T, gradient )
             alpha = 1
             alpha = self._wolfe1( alpha, p_k_stacked, slope )
             end = time.time()
@@ -1045,7 +1046,7 @@ class DampedNewton_With_Preconditioner:
 
             # Calculating Objective values
             value = self._objectivefunction( self.x )
-            self.objvalues.append( value[0] )
+            self.objvalues.append( value )
             
             if i < maxiter and ( self.err_a[-1] > tol or self.err_b[-1] > tol ) :
                  i += 1
@@ -1054,8 +1055,8 @@ class DampedNewton_With_Preconditioner:
                 break
         #end for
         return {
-          "potential_f"      : self.x[:self.a.shape[0]].reshape( self.a.shape[0], ),
-          "potential_g"      : self.x[self.a.shape[0]:].reshape( self.b.shape[0], ),
+          "potential_f"      : self.x[:self.a.shape[0]],
+          "potential_g"      : self.x[self.a.shape[0]:],
           "error_a"          : self.err_a,
           "error_b"          : self.err_b,
           "objectives"       : self.objvalues,

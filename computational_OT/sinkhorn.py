@@ -9,13 +9,13 @@ class Sinkhorn:
     -----------
         K : ndarray, shape (n,m)
             The Gibb's kernel.
-        a : ndarray, shape (n,1)
+        a : ndarray, shape (n,)
             The probability histogram of the sample of size n.
-        b : ndarray, shape (m,1)
+        b : ndarray, shape (m,)
             The probability histogram of the sample of size m.
-        u : ndarray, shape (n,1)
+        u : ndarray, shape (n,)
             The initial left marginal of the coupling.
-        v : ndarray, shape (m,1)
+        v : ndarray, shape (m,)
             The initial right marginal of the coupling.
         epsilon : float
                   The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
@@ -42,9 +42,9 @@ class Sinkhorn:
         """
         f = np.log( self.u ) * self.epsilon
         g = np.log( self.v ) * self.epsilon
-        target = np.dot( f.T, self.a ) + np.dot( g.T, self.b )
+        target = np.dot( f, self.a ) + np.dot( g, self.b )
         penalization = -self.epsilon*np.dot( np.exp( f/self.epsilon ).T, np.dot( self.K, np.exp( g/self.epsilon ) ) )
-        return target+ penalization
+        return target + penalization
 
 
   def _update( self, tol = 1e-12, maxiter = 1000 ):
@@ -81,14 +81,14 @@ class Sinkhorn:
       # sinkhorn step 1
       self.u = self.a / np.dot( self.K, self.v )
       # error computation 1
-      r = self.v*np.dot( self.K.T, self.u)
+      r = self.v * np.dot( self.K.T, self.u)
       self.err_b.append( np.linalg.norm( r - self.b ) )
       
       # sinkhorn step 2
       self.v = self.b / np.dot( self.K.T, self.u )
       
       # error computation 2
-      s = self.u*np.dot( self.K, self.v )
+      s = self.u * np.dot( self.K, self.v )
       self.err_a.append( np.linalg.norm( s - self.a ) )
       iter_condition = ( self.err_a[-1] > tol or self.err_b[-1] > tol )
       if iter_condition and i < maxiter :
@@ -102,8 +102,8 @@ class Sinkhorn:
 
     # end for
     return {
-      'potential_f' : self.epsilon * np.log( self.u ).reshape( self.a.shape[0], ),
-      'potential_g' : self.epsilon * np.log( self.v ).reshape( self.b.shape[0], ),
+      'potential_f' : self.epsilon * np.log( self.u ),
+      'potential_g' : self.epsilon * np.log( self.v ),
       'error_a'     : self.err_a,
       'error_b'     : self.err_b,
       'objectives'  : self.obj

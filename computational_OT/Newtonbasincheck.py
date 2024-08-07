@@ -8,13 +8,13 @@ class Newtonbasincheck:
         -----------
             K : ndarray, shape (n,m)
                 The Gibb's kernel.
-            a : ndarray, shape (n,1)
+            a : ndarray, shape (n,)
                 The probability histogram of the sample of size n.
-            b : ndarray, shape (m,1)
+            b : ndarray, shape (m,)
                 The probability histogram of the sample of size m.
-            u : ndarray, shape (n,1)
+            u : ndarray, shape (n,)
                 The initial left marginal of the coupling.
-            v : ndarray, shape (m,1)
+            v : ndarray, shape (m,)
                 The initial right marginal of the coupling.
             epsilon : float
                       The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
@@ -43,37 +43,36 @@ class Newtonbasincheck:
                         The value of objective function obtained by evaluating the formula Q(f,g) = < f, a > + < g, b > - epsilon * < u, Kv >,
                         where u = exp( f/epsilon ), v = exp( g/epsilon ). 
 
-        
         """
-        return np.dot( self.f.T, self.a ) + np.dot( self.g.T, self.b ) - self.epsilon * np.dot( np.exp( self.f/self.epsilon ).T, np.dot( self.K, np.exp( self.g/self.epsilon ) ) )
+        return np.dot( self.f, self.a ) + np.dot( self.g, self.b ) - self.epsilon * np.dot( np.exp( self.f/self.epsilon ).T, np.dot( self.K, np.exp( self.g/self.epsilon ) ) )
       
 
 
     def  _getHesianQ( self ):
-        Q11 = ( -1.0/self.epsilon ) * np.diag( np.exp( self.f/self.epsilon ) * np.dot( self.K,np.exp(self.g/self.epsilon ) ) )
-        Q12 = ( -1.0/self.epsilon ) * ( np.exp( self.f/self.epsilon )*self.K * ( np.exp(self.g/self.epsilon).T ) )
+        Q11 = ( - 1.0/self.epsilon ) * np.diag( np.exp( self.f/self.epsilon ) * np.dot( self.K, np.exp( self.g/self.epsilon ) ) )
+        Q12 = ( - 1.0/self.epsilon ) * ( np.exp( self.f/self.epsilon ) * self.K * ( np.exp (self.g/self.epsilon ).T ) )
         Q21 = Q12.T
-        Q22 = ( -1.0/self.epsilon )*np.diag( np.exp( self.g/self.epsilon ) * np.dot( self.K.T, np.exp( self.f/self.epsilon ) ) )
+        Q22 = ( - 1.0/self.epsilon ) * np.diag( np.exp( self.g/self.epsilon ) * np.dot( self.K.T, np.exp( self.f/self.epsilon ) ) )
         
         HessianQ = np.zeros( ( Q11.shape[0] + Q21.shape[0], Q11.shape[1] + Q12.shape[1] ) )
     
-        HessianQ[:Q11.shape[0],:Q11.shape[1]] = Q11
-        HessianQ[Q11.shape[0]:,:Q11.shape[1]] = Q12
-        HessianQ[:Q11.shape[0],Q11.shape[1]:] = Q21
-        HessianQ[Q11.shape[0]:,Q11.shape[1]:] = Q22
+        HessianQ[ : Q11.shape[0], : Q11.shape[1] ] = Q11
+        HessianQ[ Q11.shape[0] :, : Q11.shape[1] ] = Q12
+        HessianQ[ : Q11.shape[0], Q11.shape[1] : ] = Q21
+        HessianQ[ Q11.shape[0] : , Q11.shape[1] : ] = Q22
         
         return HessianQ 
     
     def _getthirdderivative( self ):
-        Q11 = ( -1.0/self.epsilon**2 ) * np.diag( np.exp( self.f/self.epsilon ) * np.dot( self.K,np.exp( self.g/self.epsilon ) ) )
-        Q12 = ( -1.0/self.epsilon**2 ) * ( np.exp( self.f/self.epsilon ) * self.K * ( np.exp(self.g/self.epsilon).T ) )
-        Q13 = ( -1.0/self.epsilon**2 ) * ( np.exp( self.f/self.epsilon ) * self.K * ( np.exp( self.g/self.epsilon ).T ) )
-        Q14 = ( -1.0/self.epsilon**2 ) * ( np.exp( self.f/self.epsilon ) * self.K * ( np.exp( self.g/self.epsilon ).T ) )
-        Q21 = ( -1.0/self.epsilon**2 ) * ( np.exp( self.g/self.epsilon ) * ( self.K.T ) * ( np.exp( self.f/self.epsilon ).T ) )
-        Q22 = ( -1.0/self.epsilon**2 ) * ( np.exp( self.g/self.epsilon ) * ( self.K.T ) * ( np.exp (self.f/self.epsilon ).T ) )
-        Q22 = ( -1.0/self.epsilon**2 ) * ( np.exp( self.g/self.epsilon ) * ( self.K.T ) * ( np.exp( self.f/self.epsilon ).T ) ) 
-        Q23 = ( -1.0/self.epsilon**2 ) * np.diag( np.exp( self.g/self.epsilon ) * np.dot( self.K.T, np.exp( self.f/self.epsilon ) ) )
-        Q24 = ( -1.0/self.epsilon**2 ) * ( np.exp( self.g/self.epsilon ) * ( self.K.T ) * ( np.exp( self.f/self.epsilon ).T ) )
+        Q11 = ( - 1.0/self.epsilon**2 ) * np.diag( np.exp( self.f/self.epsilon ) * np.dot( self.K,np.exp( self.g/self.epsilon ) ) )
+        Q12 = ( - 1.0/self.epsilon**2 ) * ( np.exp( self.f/self.epsilon ) * self.K * ( np.exp(self.g/self.epsilon).T ) )
+        Q13 = ( - 1.0/self.epsilon**2 ) * ( np.exp( self.f/self.epsilon ) * self.K * ( np.exp( self.g/self.epsilon ).T ) )
+        Q14 = ( - 1.0/self.epsilon**2 ) * ( np.exp( self.f/self.epsilon ) * self.K * ( np.exp( self.g/self.epsilon ).T ) )
+        Q21 = ( - 1.0/self.epsilon**2 ) * ( np.exp( self.g/self.epsilon ) * ( self.K.T ) * ( np.exp( self.f/self.epsilon ).T ) )
+        Q22 = ( - 1.0/self.epsilon**2 ) * ( np.exp( self.g/self.epsilon ) * ( self.K.T ) * ( np.exp (self.f/self.epsilon ).T ) )
+        Q22 = ( - 1.0/self.epsilon**2 ) * ( np.exp( self.g/self.epsilon ) * ( self.K.T ) * ( np.exp( self.f/self.epsilon ).T ) ) 
+        Q23 = ( - 1.0/self.epsilon**2 ) * np.diag( np.exp( self.g/self.epsilon ) * np.dot( self.K.T, np.exp( self.f/self.epsilon ) ) )
+        Q24 = ( - 1.0/self.epsilon**2 ) * ( np.exp( self.g/self.epsilon ) * ( self.K.T ) * ( np.exp( self.f/self.epsilon ).T ) )
 
         Derivative = np.zeros( ( Q11.shape[0] + Q12.shape[0] + Q13.shape[0] + Q14.shape[0], Q11.shape[1] + Q21.shape[1] ) )
         Derivative[ :Q11.shape[0], :Q11.shape[1] ] = Q11
@@ -86,10 +85,6 @@ class Newtonbasincheck:
         Derivative[ Q21.shape[0] + Q22.shape[0] + Q23.shape[0]:, Q11.shape[1]: ] = Q24
 
         return Derivative
-
-
-
-
 
     def _getOperatorNorm( self, A ):
         """
@@ -123,12 +118,10 @@ class Newtonbasincheck:
         h = 2 * Lambda * kappa * delta
         print( "h: ", np.abs( h ), " Lambda: ", Lambda, " kappa: ", kappa, " delta: ", delta )
         if np.abs( h ) <= 1:
-            print( "Hi" )
             d = ( 2/h ) * ( ( 1 - np.sqrt( 1 - h ) ) * delta )
 
             if self._getOperatorNorm( - np.dot( invHessianQ, HessianQ ) ) < np.abs( d ) :
                 return True
-
         else:
             False
 

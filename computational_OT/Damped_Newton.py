@@ -8,13 +8,13 @@ class DampedNewton:
         -----------
           K : ndarray, shape (n,m)
               The Gibb's kernel.
-          a : ndarray, shape (n,1)
+          a : ndarray, shape (n,)
                 The probability histogram of the sample of size n.
-          b : ndarray, shape (m,1)
+          b : ndarray, shape (m,)
                 The probability histogram of the sample of size m.
-          f : ndarray, shape (n,1)
+          f : ndarray, shape (n,)
               The initial Kantorovich potential f.
-          g : ndarray, shape (m,1)
+          g : ndarray, shape (m,)
               The initial Kantorovich potential g.
           rho : float
                 Damping factor for the line search update step.
@@ -28,7 +28,7 @@ class DampedNewton:
         self.a = a
         self.b = b
         self.epsilon = epsilon
-        self.x = np.vstack( ( f, g ) )
+        self.x = np.concatenate( ( f, g ), axis = None )
         self.rho = rho
         self.c = c
         # null vector
@@ -50,12 +50,12 @@ class DampedNewton:
         
         Parameters:
         -----------
-          f : ndarray, shape (n,1)
+          f : ndarray, shape (n,)
               The Kantorovich potential f.
         """
         u = np.exp( f/self.epsilon )
         v = np.exp( self.x[self.a.shape[0]:]/self.epsilon )
-        return self.a - ( u * np.dot( self.K,v ) ).reshape( f.shape[0], - 1 )
+        return self.a - ( u * np.dot( self.K,v ) )
 
  
       def _computegradientg( self, g ):
@@ -64,20 +64,20 @@ class DampedNewton:
         
         Parameters:
         -----------
-          g : ndarray, shape (m,1)
+          g : ndarray, shape (m,)
               The Kantorovich potential g.
 
         """
         u = np.exp( self.x[:self.a.shape[0]]/self.epsilon )
         v = np.exp( g/self.epsilon )
-        return self.b - ( v * np.dot( self.K.T, u ) ).reshape( g.shape[0], - 1 )
+        return self.b - ( v * np.dot( self.K.T, u ) )
 
       def _objectivefunction( self, x ):
         """
         
         Parameters:
         -----------
-          x : ndarray, shape (n+m,1)
+          x : ndarray, shape (n+m,)
               The stacked vector containing the potentials f and g.
             
         Returns:
@@ -152,7 +152,7 @@ class DampedNewton:
             grad_f = self._computegradientf( self.x[:self.a.shape[0]] )
             grad_g = self._computegradientg( self.x[self.a.shape[0]:] )
         
-            gradient = np.vstack( ( grad_f, grad_g ) )
+            gradient = np.concatenate( ( grad_f, grad_g ), axis = None )
             
             
             # Compute Hessian
@@ -238,7 +238,7 @@ class DampedNewton:
               print( "Inverse does not exist at epsilon:", self.epsilon )
               return np.zeros( 6 )
 
-            p_k = p_k - self.null_vector * np.dot( self.null_vector.flatten(), p_k.flatten() )
+            p_k = p_k - self.null_vector.flatten() * np.dot( self.null_vector.flatten(), p_k.flatten() )
             # 
             # if debug:
             #   cos_metric = np.dot( p_k.flatten(), gradient.flatten())/( np.linalg.norm(p_k)*np.linalg.norm(gradient) )
@@ -247,10 +247,10 @@ class DampedNewton:
             #     p_k = -p_k
 
             # Stacked
-            p_k_stacked = np.vstack( ( p_k[:self.a.shape[0]], p_k[self.a.shape[0]:] ) )
+            p_k_stacked = np.concatenate( ( p_k[:self.a.shape[0]], p_k[self.a.shape[0]:] ), axis = None )
  
             # Wolfe Condition 1: Armijo Condition  
-            slope = np.dot( p_k.T, gradient )[0][0]
+            slope = np.dot( p_k.T, gradient )
             alpha = 1
             alpha = self._wolfe1( alpha, p_k_stacked, slope )
             self.alpha.append( alpha )
@@ -268,7 +268,7 @@ class DampedNewton:
 
             # Calculating Objective values
             value = self._objectivefunction( self.x )
-            self.objvalues.append( value[0] )
+            self.objvalues.append( value )
             
             if i < maxiter and ( self.err_a[-1] > tol or self.err_b[-1] > tol ) :
                  i += 1
@@ -278,8 +278,8 @@ class DampedNewton:
       
         # end for
         return {
-          "potential_f"      : self.x[:self.a.shape[0]].reshape(self.a.shape[0],),
-          "potential_g"      : self.x[self.a.shape[0]:].reshape(self.b.shape[0],),
+          "potential_f"      : self.x[:self.a.shape[0]],
+          "potential_g"      : self.x[self.a.shape[0]:],
           "error_a"          : self.err_a,
           "error_b"          : self.err_b,
           "objectives"       : self.objvalues,

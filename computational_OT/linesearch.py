@@ -2,20 +2,20 @@ import numpy as np
 
 class LineSearch:
 
-      def __init__( self, K, a, b, f, g, epsilon, rho, rho_inc, c1, z ):
+      def __init__( self, K, a, b, f, g, epsilon, rho, rho_inc, c, z ):
         """
         
         Parameters:
         -----------
             K : ndarray, shape (n,m)
                 The Gibb's kernel.
-            a : ndarray, shape (n,1)
+            a : ndarray, shape (n,)
                 The probability histogram of the sample of size n.
-            b : ndarray, shape (m,1)
+            b : ndarray, shape (m,)
                 The probability histogram of the sample of size m.
-            f : ndarray, shape (n,1)
+            f : ndarray, shape (n,)
                 The initial Kantorovich potential f.
-            g : ndarray, shape (m,1)
+            g : ndarray, shape (m,)
                 The initial Kantorovich potential g.
             epsilon : float
                       The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
@@ -33,10 +33,10 @@ class LineSearch:
         self.a = a
         self.b = b
         self.epsilon = epsilon
-        self.x = np.hstack( ( f, g ) )
+        self.x = np.concatenate( ( f, g ), axis = None )
         self.rho = rho
         self.rho_inc = rho_inc
-        self.c1 = c1
+        self.c = c
         self.z = z
         self.alpha = []
         self.err_a = []
@@ -48,37 +48,37 @@ class LineSearch:
 
         Parameters:
         -----------
-            f : ndarray, shape (n,1)
+            f : ndarray, shape (n,)
                 Input value of the potential f.
             
         Returns:
         --------
-            ndarray, shape (n,1)
+            ndarray, shape (n,)
             The gradient of the objective function with respect to potential f.
         """
-        return ( self.a - ( np.exp( f/self.epsilon ) * np.dot( self.K, np.exp( self.x[:,1]/self.epsilon ) ) ).reshape( f.shape[0], -1 )   )
+        return ( self.a - ( np.exp( f/self.epsilon ) * np.dot( self.K, np.exp( self.x[self.a.shape[0]:]/self.epsilon ) ) )   )
 
       def _computegradientg( self, g ):
         """
 
         Parameters:
         -----------
-            g : ndarray, shape (m,1)
+            g : ndarray, shape (m,)
                 Input value of the potential g.
 
         Returns:
         --------
-            ndarray, shape (m,1)
+            ndarray, shape (m,)
             The gradient of the objective function with respect to potential g.
         """
-        return ( self.b - ( np.exp( g/self.epsilon ) * np.dot( self.K.T, np.exp( self.x[:,0]/self.epsilon ) ) ).reshape( g.shape[0], -1 ) )
+        return ( self.b - ( np.exp( g/self.epsilon ) * np.dot( self.K.T, np.exp( self.x[: self.a.shape[0]]/self.epsilon ) ) ) )
 
       def _objectivefunction( self, x ):
         """
 
         Parameters:
         -----------
-            x : ndarray, shape (n+m,1)
+            x : ndarray, shape (n+m,)
                 The vector containing the potentials f and g.
                 
         Returns:
@@ -87,12 +87,12 @@ class LineSearch:
                       The value of objective function obtained by evaluating the formula Q(f,g) = < f, a > + < g, b > - epsilon*< u, Kv >,
                       where u = exp( f/epsilon ), v = exp( g/epsilon ). 
         """
-        f = x[:,0]
-        g = x[:,1]
-        return np.dot( f.T, self.a ) + np.dot( g.T, self.b ) - self.epsilon*np.dot( np.exp( f/self.epsilon ).T, np.dot( self.K,np.exp( g/self.epsilon ) ) )
+        f = x[: self.a.shape[0]]
+        g = x[self.a.shape[0]:]
+        return np.dot( f, self.a ) + np.dot( g, self.b ) - self.epsilon * np.dot( np.exp( f/self.epsilon ).T, np.dot( self.K,np.exp( g/self.epsilon ) ) )
       
-      def _wolfe1( self, alpha, p, slope ):
-        #Armijo Condition
+    
+      def _wolfe1( self, alpha, p, slope ):#Armijo Condition
         """
 
         Parameters:
@@ -109,14 +109,21 @@ class LineSearch:
             alpha : float
                     The updated step size.
         """
-        reduction_count = 0           
-        while True:   
-            condition = self._objectivefunction( self.f + alpha * p ) < self._objectivefunction( self.f ) + self.c * alpha * slope
-            if condition or np.isnan( self._objectivefunction( self.f + alpha * p  ) ):
-                alpha = self.rho * alpha                                                     
+          
+
+        reduction_count = 0
+        while True:
+            condition = self._objectivefunction( self.x + alpha * p ) < self._objectivefunction( self.x ) + self.c * alpha * slope
+            if condition:
+                alpha = self.rho * alpha
                 reduction_count += 1
             else:
                 break
+
+        condition_inc = self._objectivefunction( self.x + ( self.rho_inc * alpha ) * p ) >= self._objectivefunction( self.x ) + self.c * ( self.rho_inc * alpha) * slope
+        if reduction_count == 0 and condition_inc:
+            alpha = self.rho_inc * alpha
+
         return alpha
 
       def _update( self, tol = 1e-12, maxiter = 1000 ):
@@ -146,13 +153,13 @@ class LineSearch:
         """
         i = 0
         while True :
-            grad_f = self._computegradientf( self.x[:,0] )
-            grad_g = self._computegradientg( self.x[:,1] )
+            grad_f = self._computegradientf( self.x[:self.a.shape[0]] )
+            grad_g = self._computegradientg( self.x[self.a.shape[0]:] )
         
-            gradient = np.vstack( ( grad_f, grad_g ) )
+            gradient = np.concatenate( ( grad_f, grad_g ), axis = None )
             
             slope = np.dot( gradient.T, gradient )
-            p_k = np.hstack( ( grad_f, grad_g ) )
+            p_k = np.concatenate( ( grad_f, grad_g ), axis = None )
 
             self.alpha.append( self.z )
             if i != 0:
@@ -161,18 +168,14 @@ class LineSearch:
             # Wolfe Condition 1:Armijo Condition  
             self.alpha[i] = self._wolfe1( self.alpha[i], p_k, slope )
 
-            #Updating f
-            self.x[:,0] = self.x[:,0] + self.alpha[i]*p_k[:,0]
+            self.x = self.x + self.alpha[i] * p_k
            
             # error computation 1
-            s = np.exp( self.x[:,0]/self.epsilon )*np.dot( self.K, np.exp( self.x[:,1]/self.epsilon ) )
+            s = np.exp( self.x[self.a.shape[0]:]/self.epsilon ) * np.dot( self.K, np.exp( self.x[self.a.shape[0]:]/self.epsilon ) )
             self.err_a.append( np.linalg.norm( s - self.a ) )
-
-
-            #updating g
-            self.x[:,1] = self.x[:,1] + self.alpha[i]*p_k[:,1]
+            
             # error computation 2
-            r = np.exp( self.x[:,1]/self.epsilon )*np.dot( self.K .T, np.exp( self.x[:,0]/self.epsilon ) )
+            r = np.exp( self.x[:self.a.shape[0]]/self.epsilon ) * np.dot( self.K .T, np.exp( self.x[:self.a.shape[0]] /self.epsilon ) )
             self.err_b.append( np.linalg.norm( r - self.b ) )
 
             #Calculating Objective values
@@ -186,8 +189,8 @@ class LineSearch:
       
         # end for    
         return {
-          'potential_f' : self.x[:,0],
-          'potential_g' : self.x[:,1],
+          'potential_f' : self.x[: self.a.shape[0]],
+          'potential_g' : self.x[self.a.shape[0] : ],
           'error_a' : self.err_a,
           'error_b' : self.err_b,
           'objectives' : self.objvalues,
