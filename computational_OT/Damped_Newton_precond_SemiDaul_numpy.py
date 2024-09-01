@@ -9,7 +9,6 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         Parameters:
         -----------
             C : ndarray, shape (n,m), 
-                n and m are the sizes of the samples from the two point clouds.
                 It is the cost matrix between the sample points of the two point clouds.
             a : ndarray, shape (n,)
                 The probability histogram of the sample of size n.
@@ -42,11 +41,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         self.objvalues = [] 
         self.timing = []
         self.out = []
-        # Computing minimum of  C-f for each column of this difference matrix.
-        self.f_C = np.min( self.C - self.f[:,None], axis = 0 )# The C-transform of f, shape : (m,).
-        # We know e^((-(C-f)+self.min_f)/epsilon)<1, therefore the value of self.g below is bounded.
-        self.H = self.C - self.f[:,None] - self.f_C[None,:] # Shape : (n,m)     
-        self.g = self.f_C -self.epsilon * np.log( np.sum( self.a[:,None] * np.exp( -self.H /self.epsilon ), axis = 0 ) )# Shape : (m,)
+        self.g = self.logexp_g( self.C - self.f[:,None] )# Shape : (m,)
         self.z = self.C - self.f[:,None] - self.g[None,:]# Shape : (n,m)
 
     def _objectivefunction( self, f ) :
@@ -54,19 +49,16 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         
         Parameters:
         -----------
-          f : ndarray, shape (n,)
-              The Kantorovich potential f.
-              
+            f : ndarray, shape (n,)
+                The Kantorovich potential f.
+                
         Returns : 
         ---------
-          Q_semi(f) : float
-                      The value of semi-dual objective function obtained by evaluating the formula Q_semi(f) = <f,a> + <g(f,C,epsilon),b>,
-                      where g(f,C,epsilon) is the value of Kantorovich potential g obtained by using the Schrodinger-bridge equations between f and g.
+            Q_semi(f) : float
+                        The value of semi-dual objective function obtained by evaluating the formula Q_semi(f) = <f,a> + <g(f,C,epsilon),b>,
+                        where g(f,C,epsilon) is the value of Kantorovich potential g obtained by using the Schrodinger-bridge equations between f and g.
         """
-        # Computing minimum of  C-f for each column of this difference matrix.
-        f_C = np.min( self.C - f[:,None], axis = 0 )# The C-transform of f, shape : (m,).
-        H = self.C - f[:,None] - f_C[None,:]# Shape : (n,m)
-        g = f_C - self.epsilon * np.log( np.sum( self.a[:,None] * np.exp( - H /self.epsilon ), axis = 0 ) ) # Shape : (m,)
+        g = self.logexp_g( self.C - f[:,None] )
         Q_semi = np.dot( f, self.a ) + np.dot( g, self.b ) 
         return Q_semi
       
@@ -76,6 +68,45 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         """
         gradient = self.a * ( np.ones( self.a.shape[0] ) - np.sum( np.exp( - self.z/self.epsilon ) * self.b[None,:], axis = 1 ) )# Shape : (n,)
         return gradient
+    
+    def _g( self, H ):
+        """
+
+        Parameters:
+        -----------
+            a : ndarray, shape (n,)
+                The probability histogram of the sample of size n.
+            H : ndarray, shape (n,m)
+                It is the matrix obtained from C - f.
+            epsilon :   float
+                        The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
+                    
+        Returns:
+        --------
+            ndarray, shape (m,)
+            The value of potential g obtained from the Schrodinger-bridge equation between the potentials f and g.
+        """
+        return -self.epsilon * np.log( np.sum( self.a[:,None] * np.exp( -H/self.epsilon ), 0 ) )
+    
+    def logexp_g( self, H ):
+        """
+
+        Parameters:
+        -----------
+            a : ndarray, shape (n,)
+                The probability histogram of the sample of size n.
+            H : ndarray, shape (n,m)
+                It   is the matrix obtained from C - f.
+            epsilon :  float
+                       The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
+
+        Returns:
+        --------
+            ndarray, shape (m,)
+            The value of potential g obtained from the Schrodinger-bridge equation between the potentials f and g after log-exp regularization.
+
+        """
+        return self._g( H - np.min( H, 0 ) ) + np.min( H, 0 )
 
     def _wolfe1( self,  alpha, p, slope ):
         #Armijo Condition
@@ -887,14 +918,14 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
             timings : ndarray, shape (k,), where k is the number of points where the timestamps are recorded
                       The timestamps recorded in different versions.
         """
-        i = 0
+        i = 1
         while True: 
             # Compute gradient w.r.t f:
             grad_f = self._computegradientf()# Shape : (n,)
             # Compute the Hessian:
             M = self.a[:,None] * np.exp( -self.z/self.epsilon ) * np.sqrt( self.b )[None,:]# Shape : (n,m)
-            Sum_M = np.sum( M*np.sqrt( self.b )[None,:], axis = 1 )# Shape : (n,)
-            self.Hessian = Sum_M[:,None] * np.identity( self.a.shape[0] ) - np.dot( M, M.T )  # Shape : (n,n)
+            Sum_M = np.sum( M * np.sqrt( self.b )[None,:], axis = 1 )# Shape : (n,)
+            self.Hessian = np.diag( Sum_M ) - np.dot( M, M.T )  # Shape : (n,n)
             # Compute solution of Ax = b:
             if version == 4:
               print("\n At iteration: ",i)
@@ -946,11 +977,9 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
             self.alpha_list.append( alpha )
             # Update f and g:
             self.f = self.f + alpha * p_k
-            self.f_C = np.min( self.C - self.f[:,None], axis = 0 )# The C-transform of f, shape : (m,). 
-            self.H = self.C - self.f[:,None] - self.f_C[None,:]# Shape : (n,m)
-            self.g = self.f_C - self.epsilon * np.log( np.sum( self.a[:,None] * np.exp( -self.H /self.epsilon ), axis = 0 ) )# Shape : (m,)
-            self.z = self.C - self.f[:,None] - self.g[None,:]# Shape : (n,m)
-            P = self.a[:,None]*( np.exp( -self.z/self.epsilon ) ) * self.b[None,:]# Shape : (n,m)
+            self.g = self.logexp_g( self.C - self.f[:,None] )# Shape : (m,)
+            self.z = ( self.C - self.f[:,None] - self.g[None,:] )# Shape : (n,m)
+            P = self.a[:,None] * ( np.exp( - self.z/self.epsilon ) ) * self.b[None,:]# Shape : (n,m)
             # Error computation:
             self.err.append( np.linalg.norm( np.sum( P, axis = 1 ) - self.a, ord = 1 ) )
             # Calculating objective function:
