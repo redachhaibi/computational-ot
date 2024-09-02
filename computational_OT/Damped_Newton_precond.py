@@ -607,11 +607,11 @@ class DampedNewton_With_Preconditioner:
           self.m = matrix
           A = scipy.sparse.linalg.LinearOperator( ( self.m.shape[0], self.m.shape[1] ), matvec = mv ) 
           if optType == 'cg':
-            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0 = gradient, maxiter = iterative_inversion, tol = 1e-10 )
+            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0 = gradient, maxiter = iterative_inversion, atol = 1e-10 )
             print( "  --- CG exit code: ", exit_code )
 
           else:
-            inverse, exit_code = scipy.sparse.linalg.gmres( A, gradient, x0 = gradient, maxiter = iterative_inversion, tol = 1e-10 )
+            inverse, exit_code = scipy.sparse.linalg.gmres( A, gradient, x0 = gradient, maxiter = iterative_inversion, atol = 1e-10 )
             print( "  --- GMRES exit code: ", exit_code )
           p_k = self.epsilon * inverse
           p_k = p_k.reshape( ( p_k.shape[0], 1 ) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
@@ -742,10 +742,10 @@ class DampedNewton_With_Preconditioner:
           self.m = matrix
           A = scipy.sparse.linalg.LinearOperator( ( self.m.shape[0], self.m.shape[1] ), matvec = _preconditioned_map ) 
           if optType == 'cg':
-            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0 = gradient, maxiter = iterative_inversion, tol = 1e-10 )
+            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0 = gradient, maxiter = iterative_inversion, atol = 1e-10 )
             print( "  --- CG exit code: ", exit_code )
           else:
-            inverse, exit_code = scipy.sparse.linalg.gmres( A, gradient, x0 = gradient, maxiter = iterative_inversion, tol = 1e-10 )
+            inverse, exit_code = scipy.sparse.linalg.gmres( A, gradient, x0 = gradient, maxiter = iterative_inversion, atol = 1e-10 )
             print( "  --- GMRES exit code: ", exit_code)
           p_k = self.epsilon * inverse
           p_k = p_k.reshape( ( p_k.shape[0], 1 ) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
@@ -877,10 +877,10 @@ class DampedNewton_With_Preconditioner:
           self.m  = matrix
           A = scipy.sparse.linalg.LinearOperator( ( self.m.shape[0], self.m.shape[1] ), matvec = _preconditioned_map ) 
           if optType == 'cg':
-            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0 = gradient, maxiter = iterative_inversion, tol = 1e-10 )
+            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0 = gradient, maxiter = iterative_inversion, atol = 1e-10 )
             # print( "  --- CG exit code: ", exit_code)
           else:
-            inverse, exit_code = scipy.sparse.linalg.gmres( A, gradient, x0 = gradient, maxiter = iterative_inversion, tol = 1e-10 )
+            inverse, exit_code = scipy.sparse.linalg.gmres( A, gradient, x0 = gradient, maxiter = iterative_inversion, atol = 1e-10 )
             # print( "  --- GMRES exit code: ", exit_code)
           p_k = self.epsilon * inverse
           p_k = p_k.reshape( ( p_k.shape[0], 1)  ) # For some reason, this outputs (n,) and the next line outputs (n,1)
