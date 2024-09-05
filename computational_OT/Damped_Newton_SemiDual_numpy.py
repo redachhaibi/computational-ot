@@ -35,7 +35,7 @@ class DampedNewton_SemiDual_np:
         self.null_vector = np.reshape( null_vector, ( self.a.shape[0], 1 ) )# Shape : (n,1)
         self.reg_matrix = np.dot( self.null_vector, self.null_vector.T )# Shape : (n,n)
         self.g = self._logexp_g( self.C - self.f[:,None] )# Shape : (m,)
-        self.z = self.C - self.f[:,None] -  self.g[None,:] # Shape : (n,m)
+        self.z = self.C - self.f[:,None] -  self.g[None,:]# Shape : (n,m)
 
     def _objectivefunction( self, f ) :
         """ 
@@ -54,7 +54,7 @@ class DampedNewton_SemiDual_np:
         g = self._logexp_g( self.C - f[:,None] )
         Q_semi = np.dot( f, self.a ) + np.dot( g, self.b ) 
         return Q_semi
-      
+        
     def _computegradientf( self ):
         """ 
             Compute gradient with respect to f of the objective function Q_semi(.).
@@ -130,7 +130,7 @@ class DampedNewton_SemiDual_np:
                 break
         return alpha
         
-    def _update( self, tol = 1e-12, maxiter = 100 ):
+    def _update( self, tol = 1e-12, maxiter = 100, threshold_epsilon = 0.02 ):
         """
 
         Parameters:
@@ -139,6 +139,9 @@ class DampedNewton_SemiDual_np:
                   The tolerance limit for the error. Defaults to 1e-12.
             maxiter : int 
                       The maximum iteration for the optimization algorithm. Defaults to 100.
+            threshold_epsilon : float
+                                The threshold on the epsilon for which the Hessian is regularized with 
+                                the eigenvectors corresponding to the negative eigenvalues and eigenvalues that are greater than one.
         Returns:
         --------
         Returns a dictionary where the keys are strings and the values are ndarrays.
@@ -162,16 +165,32 @@ class DampedNewton_SemiDual_np:
             M = self.a[:,None] * np.exp( - self.z/self.epsilon ) * np.sqrt( self.b )[None,:]
             Sum_M = np.sum( M * np.sqrt( self.b )[None,:], 1 )
             self.Hessian = - ( np.diag( Sum_M ) - np.dot( M, M.T ) )/self.epsilon
-            mean_eig =  -( np.mean( np.diag( Sum_M )  ) )/self.epsilon
+            mean_eig =  -( np.mean( np.diag( Sum_M ) ) )/self.epsilon
             # Regularizing the Hessian using the regularization vector with the factor being the mean of eigenvalues of the Hessian 
-            self.Hessian_stabilized = self.Hessian +  mean_eig * self.reg_matrix
+            self.Hessian_stabilized = self.Hessian + mean_eig * self.reg_matrix
+            if self.epsilon <= threshold_epsilon:
+                eig, v = np.linalg.eigh( self.Hessian_stabilized )
+                sorted_indices = np.argsort( eig )
+                v = v[ :,sorted_indices ]
+                # print( len( np.where( eig < 1e-1000 )[0] ) )
+                k = len( np.where( eig < 1e-1000 )[0] )
+                # print( "Condition number: ", np.max(eig)/np.min(eig) )
+                # Regularizig the Hessian with the eigenvectors corresponding to eigenvalues less than 0
+                for eigv in v[:k]:
+                    self.Hessian_stabilized = self.Hessian_stabilized + mean_eig * np.dot( eigv[:, None] , eigv[:, None].T )
+                # Regularizig the Hessian with the eigenvectors corresponding to eigenvalues greater than 1
+                greaterthan_one = np.where( eig > 1  )[0]
+                if len( greaterthan_one ) > 1:
+                    for eigv in v[:greaterthan_one]:
+                        self.Hessian_stabilized = self.Hessian_stabilized - mean_eig * np.dot( eigv[:, None] , eigv[:, None].T )
+
             try:    
-                p_k = - np.linalg.solve( self.Hessian_stabilized , grad_f )  
+                p_k = - np.linalg.solve( self.Hessian_stabilized, grad_f )  
             except np.linalg.LinAlgError as e:
                 print(f"An error occurred: {e}")
                 return np.zeros(5)
             p_k = p_k - self.null_vector.flatten() * np.dot( self.null_vector.flatten(), p_k )# Shape : (n,)
-            # Wolfe condition 1: Armijo Condition:  
+            # Wolfe condition 1: Armijo Condition:      
             slope = np.dot( p_k, grad_f )
             alpha = 1
             alpha = self._wolfe1( alpha, p_k, slope )

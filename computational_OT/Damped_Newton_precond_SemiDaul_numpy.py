@@ -41,7 +41,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         self.objvalues = [] 
         self.timing = []
         self.out = []
-        self.g = self.logexp_g( self.C - self.f[:,None] )# Shape : (m,)
+        self.g = self._logexp_g( self.C - self.f[:,None] )# Shape : (m,)
         self.z = self.C - self.f[:,None] - self.g[None,:]# Shape : (n,m)
 
     def _objectivefunction( self, f ) :
@@ -58,7 +58,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
                         The value of semi-dual objective function obtained by evaluating the formula Q_semi(f) = <f,a> + <g(f,C,epsilon),b>,
                         where g(f,C,epsilon) is the value of Kantorovich potential g obtained by using the Schrodinger-bridge equations between f and g.
         """
-        g = self.logexp_g( self.C - f[:,None] )
+        g = self._logexp_g( self.C - f[:,None] )
         Q_semi = np.dot( f, self.a ) + np.dot( g, self.b ) 
         return Q_semi
       
@@ -88,7 +88,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         """
         return -self.epsilon * np.log( np.sum( self.a[:,None] * np.exp( -H/self.epsilon ), 0 ) )
     
-    def logexp_g( self, H ):
+    def _logexp_g( self, H ):
         """
 
         Parameters:
@@ -128,8 +128,8 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         """
         reduction_count = 0           
         while True:   
-            condition = self._objectivefunction( self.f + alpha*p ) < self._objectivefunction( self.f ) + self.c * alpha*slope
-            if condition or np.isnan(self._objectivefunction( self.f + alpha*p )):
+            condition = self._objectivefunction( self.f + alpha * p ) < self._objectivefunction( self.f ) + self.c * alpha * slope
+            if condition or np.isnan(self._objectivefunction( self.f + alpha * p )):
                 alpha = self.rho * alpha                                                     
                 reduction_count += 1
             else:
@@ -593,6 +593,8 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         interval = 1e3 * ( end - start2 )
         timings.append( interval )
         print( "|--- Time required for changing A to PAP: ", np.round( interval, 5 ), "ms---|" )
+      
+
         # Solve either iteratively using CG or exactly
         def mv( vector ):
             return np.dot( matrix, vector ) 
@@ -685,7 +687,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         Ay = np.dot( matrix, y )
         eigenvalues = np.sum( y * Ay, axis = 0 )
         # Compute data for P = id + y*diag(values)*y.T
-        values = ( 1/np.sqrt(eigenvalues) - 1 )    # Vector of size k
+        values = ( 1/np.sqrt(eigenvalues) - 1 )# Vector of size k
         z = y * values[None,:]
         # Record timings
         end = time.time()
@@ -725,14 +727,15 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
           self.m = matrix
           A = scipy.sparse.linalg.LinearOperator( ( self.m.shape[0], self.m.shape[1] ), matvec = _preconditioned_map ) 
           if optType == 'cg':
-            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0 = gradient, maxiter = iterative_inversion, atol = 1e-10 )
+            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0 = gradient, maxiter = iterative_inversion, rtol = 1e-10 )
             print( "  --- CG exit code: ", exit_code)
           else: 
-            inverse, exit_code = scipy.sparse.linalg.gmres( A, gradient, x0 = gradient, maxiter = iterative_inversion, atol = 1e-10 )
+            inverse, exit_code = scipy.sparse.linalg.gmres( A, gradient, x0 = gradient, maxiter = iterative_inversion, rtol = 1e-10 )
             print( "  --- GMRES exit code: ", exit_code )
           p_k = self.epsilon * inverse
           p_k = p_k.reshape( ( p_k.shape[0], 1 ) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
         else:
+          matrix = matrix + np.dot( vector_E, vector_E.T )
           B = np.dot( Ay, z.T )
           C = z @ np.dot( y.T, Ay ) @ z.T
           matrix = matrix + B + B.T + C
@@ -851,7 +854,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
           self.m  = matrix
           A = scipy.sparse.linalg.LinearOperator( ( self.m.shape[0], self.m.shape[1] ), matvec = _preconditioned_map ) 
           if optType == 'cg':
-            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0 = gradient, maxiter = iterative_inversion, atol = 1e-10 )
+            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0 = gradient, maxiter = iterative_inversion, rtol = 1e-10 )
             # print( "  --- CG exit code: ", exit_code)
           else:
             inverse, exit_code = scipy.sparse.linalg.gmres( A, gradient, x0 = gradient, maxiter = iterative_inversion, atol = 1e-10 )
@@ -859,6 +862,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
           p_k = self.epsilon * inverse
           p_k = p_k.reshape( ( p_k.shape[0], 1 ) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
         else:
+          matrix = matrix + np.dot( vector_E, vector_E.T )
           B = np.dot( Ay, z.T )
           C = z @ np.dot( y.T, Ay ) @ z.T
           matrix = matrix + B + B.T + C
@@ -880,7 +884,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         # print("|--- Time taken for the complete code block: ",np.round( interval,2),"ms---|\n")
         return p_k, timings
     
-    def _update( self, tol = 1e-12, maxiter = 100, iterative_inversion = - 1, version = 1, debug = False, optType = 'cg' ):
+    def _update( self, tol = 1e-12, maxiter = 50, iterative_inversion = - 1, version = 1, debug = False, optType = 'cg' ):
         """
 
         Parameters:
@@ -977,7 +981,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
             self.alpha_list.append( alpha )
             # Update f and g:
             self.f = self.f + alpha * p_k
-            self.g = self.logexp_g( self.C - self.f[:,None] )# Shape : (m,)
+            self.g = self._logexp_g( self.C - self.f[:,None] )# Shape : (m,)
             self.z = ( self.C - self.f[:,None] - self.g[None,:] )# Shape : (n,m)
             P = self.a[:,None] * ( np.exp( - self.z/self.epsilon ) ) * self.b[None,:]# Shape : (n,m)
             # Error computation:
