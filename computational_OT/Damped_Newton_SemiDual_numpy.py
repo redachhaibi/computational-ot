@@ -173,17 +173,16 @@ class DampedNewton_SemiDual_np:
                 sorted_indices = np.argsort( eig )
                 v = v[ :,sorted_indices ]
                 # print( len( np.where( eig < 1e-1000 )[0] ) )
-                k = len( np.where( eig < 1e-1000 )[0] )
+                p = len( np.where( eig < 1e-1000 )[0] ) # Number of eigenvalue less than one
                 # print( "Condition number: ", np.max(eig)/np.min(eig) )
                 # Regularizig the Hessian with the eigenvectors corresponding to eigenvalues less than 0
-                for eigv in v[:k]:
+                for eigv in v[:p]:
                     self.Hessian_stabilized = self.Hessian_stabilized + mean_eig * np.dot( eigv[:, None] , eigv[:, None].T )
                 # Regularizig the Hessian with the eigenvectors corresponding to eigenvalues greater than 1
-                greaterthan_one = np.where( eig > 1  )[0]
-                if len( greaterthan_one ) > 1:
-                    for eigv in v[:greaterthan_one]:
+                q = len( np.where( eig > 1  )[0] )# Number of eigenvalues greater than 1
+                if q > 1:
+                    for eigv in v[-q:]:
                         self.Hessian_stabilized = self.Hessian_stabilized - mean_eig * np.dot( eigv[:, None] , eigv[:, None].T )
-
             try:    
                 p_k = - np.linalg.solve( self.Hessian_stabilized, grad_f )  
             except np.linalg.LinAlgError as e:
