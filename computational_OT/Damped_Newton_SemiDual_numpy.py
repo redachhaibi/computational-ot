@@ -164,24 +164,22 @@ class DampedNewton_SemiDual_np:
             # Compute the Hessian:
             M = self.a[:,None] * np.exp( - self.z/self.epsilon ) * np.sqrt( self.b )[None,:]
             Sum_M = np.sum( M * np.sqrt( self.b )[None,:], 1 )
-            self.Hessian = - ( np.diag( Sum_M ) - np.dot( M, M.T ) )/self.epsilon
+            self.Hessian = -( np.diag( Sum_M ) - np.dot( M, M.T ) )/self.epsilon
             mean_eig =  -( np.mean( np.diag( Sum_M ) ) )/self.epsilon
             # Regularizing the Hessian using the regularization vector with the factor being the mean of eigenvalues of the Hessian 
             self.Hessian_stabilized = self.Hessian + mean_eig * self.reg_matrix
             if self.epsilon <= threshold_epsilon:
                 eig, v = np.linalg.eigh( self.Hessian_stabilized )
                 sorted_indices = np.argsort( eig )
-                v = v[ :,sorted_indices ]
-                # print( len( np.where( eig < 1e-1000 )[0] ) )
-                p = len( np.where( eig < 1e-1000 )[0] ) # Number of eigenvalue less than one
-                # print( "Condition number: ", np.max(eig)/np.min(eig) )
-                # Regularizig the Hessian with the eigenvectors corresponding to eigenvalues less than 0
-                for eigv in v[:p]:
+                v = v[ :, sorted_indices ]
+                p = len( np.where( eig > 0.0 )[0] ) # Number of eigenvalue greater than 0
+                # Regularizig the Hessian with the eigenvectors corresponding to eigenvalues greater than 0
+                for eigv in v[-p:]:
                     self.Hessian_stabilized = self.Hessian_stabilized + mean_eig * np.dot( eigv[:, None] , eigv[:, None].T )
-                # Regularizig the Hessian with the eigenvectors corresponding to eigenvalues greater than 1
-                q = len( np.where( eig > 1  )[0] )# Number of eigenvalues greater than 1
-                if q > 1:
-                    for eigv in v[-q:]:
+                # Regularizig the Hessian with the eigenvectors corresponding to eigenvalues less than -1
+                q = len( np.where( eig < -1.0  )[0] )# Number of eigenvalues less than -1
+                if q > 0:
+                    for eigv in v[:q]:
                         self.Hessian_stabilized = self.Hessian_stabilized - mean_eig * np.dot( eigv[:, None] , eigv[:, None].T )
             try:    
                 p_k = - np.linalg.solve( self.Hessian_stabilized, grad_f )  
