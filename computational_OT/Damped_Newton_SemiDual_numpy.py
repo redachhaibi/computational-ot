@@ -31,7 +31,7 @@ class DampedNewton_SemiDual_np:
         self.alpha_list = []
         self.err = []
         self.objvalues = [] 
-        null_vector = np.ones( self.a.shape[0] )/np.sqrt( self.a.shape[0] )
+        null_vector = np.hstack( np.ones( self.a.shape[0] ) )/np.sqrt( self.a.shape[0] )
         self.null_vector = np.reshape( null_vector, ( self.a.shape[0], 1 ) )# Shape : (n,1)
         self.reg_matrix = np.dot( self.null_vector, self.null_vector.T )# Shape : (n,n)
         self.g = self._logexp_g( self.C - self.f[:,None] )# Shape : (m,)
@@ -52,12 +52,14 @@ class DampedNewton_SemiDual_np:
                         where g(f,C,epsilon) is the value of Kantorovich potential g obtained by using the Schrodinger-bridge equations between f and g.
         """
         g = self._logexp_g( self.C - f[:,None] )
-        Q_semi = np.dot( f, self.a ) + np.dot( g, self.b ) 
+        Q_semi = np.dot( f, self.a ) + np.dot( g, self.b )
         return Q_semi
+
+
         
     def _computegradientf( self ):
         """ 
-            Compute gradient with respect to f of the objective function Q_semi(.).
+            Compute gradient of the objective function Q_semi(.) with respect to f.
         """
         gradient = self.a * ( np.ones( self.a.shape[0] ) - np.sum( np.exp( - self.z/self.epsilon ) * self.b[None,:], axis = 1 ) )# Shape : (n,)
         return gradient
@@ -71,8 +73,8 @@ class DampedNewton_SemiDual_np:
                 The probability histogram of the sample of size n.
             H : ndarray, shape (n,m)
                 It is the matrix obtained from C - f.
-            epsilon :   float
-                        The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
+            epsilon :  float
+                       The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
                     
         Returns:
         --------
@@ -89,7 +91,7 @@ class DampedNewton_SemiDual_np:
             a : ndarray, shape (n,)
                 The probability histogram of the sample of size n.
             H : ndarray, shape (n,m)
-                It   is the matrix obtained from C - f.
+                It is the matrix obtained from C - f.
             epsilon :  float
                        The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
 
@@ -111,7 +113,7 @@ class DampedNewton_SemiDual_np:
             alpha : float  
                     The update step size.
             p : ndarray, shape (n,)
-                The optimal direction.
+                The optimal update direction.
             slope : float
                     It is the inner product of the gradient and p.
 
@@ -120,7 +122,7 @@ class DampedNewton_SemiDual_np:
             alpha : float
                     The updated step size.
         """
-        reduction_count = 0           
+        reduction_count = 0     
         while True:   
             condition = self._objectivefunction( self.f + alpha * p ) < self._objectivefunction( self.f ) + self.c * alpha * slope
             if condition or np.isnan( self._objectivefunction( self.f + alpha * p  ) ):
@@ -168,19 +170,6 @@ class DampedNewton_SemiDual_np:
             mean_eig =  -( np.mean( np.diag( Sum_M ) ) )/self.epsilon
             # Regularizing the Hessian using the regularization vector with the factor being the mean of eigenvalues of the Hessian 
             self.Hessian_stabilized = self.Hessian + mean_eig * self.reg_matrix
-            if self.epsilon <= threshold_epsilon:
-                eig, v = np.linalg.eigh( self.Hessian_stabilized )
-                sorted_indices = np.argsort( eig )
-                v = v[ :, sorted_indices ]
-                p = len( np.where( eig > 0.0 )[0] ) # Number of eigenvalue greater than 0
-                # Regularizig the Hessian with the eigenvectors corresponding to eigenvalues greater than 0
-                for eigv in v[-p:]:
-                    self.Hessian_stabilized = self.Hessian_stabilized + mean_eig * np.dot( eigv[:, None] , eigv[:, None].T )
-                # Regularizig the Hessian with the eigenvectors corresponding to eigenvalues less than -1
-                q = len( np.where( eig < -1.0  )[0] )# Number of eigenvalues less than -1
-                if q > 0:
-                    for eigv in v[:q]:
-                        self.Hessian_stabilized = self.Hessian_stabilized - mean_eig * np.dot( eigv[:, None] , eigv[:, None].T )
             try:    
                 p_k = - np.linalg.solve( self.Hessian_stabilized, grad_f )  
             except np.linalg.LinAlgError as e:

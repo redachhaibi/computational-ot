@@ -128,9 +128,9 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         """
         reduction_count = 0           
         while True:   
-            condition = self._objectivefunction( self.f + alpha * p ) < self._objectivefunction( self.f ) + self.c * alpha * slope
-            if condition or np.isnan(self._objectivefunction( self.f + alpha * p )):
-                alpha = self.rho * alpha                                                     
+            condition1 = self._objectivefunction( self.f + alpha * p ) < self._objectivefunction( self.f ) + self.c * alpha * slope
+            if condition1 or np.isnan( self._objectivefunction( self.f + alpha * p  ) ):
+                alpha = self.rho * alpha    
                 reduction_count += 1
             else:
                 break
@@ -192,7 +192,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
             P_matrix = np.identity( n ) + ( 1/np.sqrt( value ) - 1 ) * np.dot( vector, vector.T )
             # Transforms
             matrix = np.dot( P_matrix, np.dot( matrix, P_matrix ) )
-            gradient = np.dot( P_matrix, gradient)
+            gradient = np.dot( P_matrix, gradient )
             unwinding_transformations.append( [ P_matrix, lambda P, x : np.dot( P, x ) ] )
         # end for
         end = time.time()
@@ -401,19 +401,20 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         # Construct modified Hessian
         diag = 1/np.sqrt( np.diag( unnormalized_Hessian ).flatten() )
         self.modified_Hessian = diag[:,None] * unnormalized_Hessian * diag[None,:]
+        self.modified_Hessian = unnormalized_Hessian
         
         # Dummy variable to work on
         matrix = self.modified_Hessian
 
         # Preconditioning along null vector
         vector = self.null_vector
-        vector = vector/diag
+        vector = vector
         vector = vector/np.linalg.norm( vector )
         vector = vector.reshape( ( len( vector ), 1 ) )
         matrix = matrix + np.dot( vector, vector.T )
         # Transformations
         gradient = diag[:,None] * gradient[:,None]
-        unwinding_transformations.append( [ diag, lambda d, x : d[:,None] * x ] )
+        # unwinding_transformations.append( [ diag, lambda d, x : d[:,None] * x ] )
         end = time.time()
         interval = 1e3 * ( end - start )
         timings.append( interval )
@@ -431,9 +432,9 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         Ay = np.dot( matrix, y )
         eigenvalues = np.sum( y * Ay, axis = 0 )
         # Compute P_matrix = id + y*diag(values)*y.T
-        values = ( ( 1/np.sqrt(eigenvalues) ) - 1 )    # Vector of size k
+        values = ( ( 1/(np.sqrt(eigenvalues) ) ) - 1 )    # Vector of size k
         z = y * values[None,:]
-        P_matrix = np.identity( n ) + np.dot( z, y.T )
+        P_matrix = ( 1/np.sqrt(2) ) * ( np.identity( n ) + np.dot( z, y.T ) )
         # Old version
         # P_matrix = np.identity(n)
         # for i in range(k):
@@ -500,13 +501,13 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         print( "|--- Time taken to invert the linear system for p_k: ", np.round( interval, 5 ), "ms---|" )
 
         start5 = time.time()
-        # Unwind
-        for transform in unwinding_transformations:
-          P, f = transform
-          p_k = f(P, p_k)
-        end = time.time()
-        interval = 1e3 * ( end - start5 )
-        timings.append( interval )
+        # # Unwind
+        # for transform in unwinding_transformations:
+        #   P, f = transform
+        #   p_k = f(P, p_k)
+        # end = time.time()
+        # interval = 1e3 * ( end - start5 )
+        # timings.append( interval )
 
         print( "|--- Time taken for unwinding: ", np.round( interval, 5 ), "ms---|" )
         interval = 1e3 * ( end - start )
@@ -515,7 +516,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         print( "|--- Time taken for the complete code block: ", np.round( interval, 2 ), "ms---|\n" ) 
         return p_k, timings
 
-    def _precond_inversion_v3( self, unnormalized_Hessian, gradient, iterative_inversion = - 1, optType = None ):
+    def _precond_inversion_v3( self, unnormalized_Hessian, gradient, rtol, atol,iterative_inversion = - 1,  optType = None ):
         """
 
         Parameters:
@@ -573,7 +574,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         # Compute P_matrix = id + y*diag(values)*y.T
         values = ( 1/np.sqrt(eigenvalues) - 1 )    # Vector of size k
         z = y * values[None,:]
-        P_matrix = np.identity( n ) + np.dot( z, y.T )
+        P_matrix = ( np.identity( n ) + np.dot( z, y.T ) )
         # Done
         unwinding_transformations.append( [ P_matrix, lambda P, x : np.dot( P, x ) ] )
         # Record timings
@@ -601,12 +602,12 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         start3 = time.time()
         if iterative_inversion >= 0:
           self.m = matrix
-          A = scipy.sparse.linalg.LinearOperator( ( self.m.shape[0],self.m.shape[1] ), matvec = mv ) 
+          A = scipy.sparse.linalg.LinearOperator( ( self.m.shape[0], self.m.shape[1] ), matvec = mv ) 
           if optType == 'cg':
-            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0 = gradient, maxiter = iterative_inversion, atol = 1e-10 )
+            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0 = gradient, maxiter = iterative_inversion, rtol = rtol, atol = atol )
             print( "  --- CG exit code: ", exit_code)
           else:
-            inverse, exit_code = scipy.sparse.linalg.gmres( A, gradient, x0 = gradient, maxiter =   iterative_inversion, atol = 1e-10 )
+            inverse, exit_code = scipy.sparse.linalg.gmres( A, gradient, x0 = gradient, maxiter =   iterative_inversion, rtol = rtol, atol = atol  )
             print( "  --- GMRES exit code: ", exit_code)
           p_k = self.epsilon * inverse
           p_k = p_k.reshape( ( p_k.shape[0], 1 ) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
@@ -631,7 +632,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         print("|--- Time taken for the complete code block: ", np.round( interval, 2 ), "ms---|\n")
         return p_k, timings
       
-    def _precond_inversion_v4( self, unnormalized_Hessian, gradient, iterative_inversion = - 1, optType = None ):
+    def _precond_inversion_v4( self, unnormalized_Hessian, gradient, rtol, atol, iterative_inversion = - 1, optType = None ):
         """
 
         Parameters:
@@ -667,6 +668,10 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         vector = vector/diag
         vector = vector/np.linalg.norm( vector )
         vector_E = vector
+        if iterative_inversion < 0:
+          vector = vector.reshape( ( len(vector), 1 ) )
+          matrix = matrix + np.dot( vector, vector.T )
+
         # Transformations (Initial on gradient and final on result)
         gradient = diag[:,None] * gradient[:,None]
         unwinding_transformations.append( lambda x : diag[:,None] * x )
@@ -701,7 +706,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         # Function mapping v to Pv
         # P = Id + z*y.T
         def _apply_P( vector ):
-          return vector + z @ ( y.T @ vector )
+          return  vector + z @ ( y.T @ vector ) 
         
         # Function mapping v to P(A+E)Pv
         # A is matrix
@@ -727,15 +732,14 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
           self.m = matrix
           A = scipy.sparse.linalg.LinearOperator( ( self.m.shape[0], self.m.shape[1] ), matvec = _preconditioned_map ) 
           if optType == 'cg':
-            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0 = gradient, maxiter = iterative_inversion, rtol = 1e-10 )
+            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0 = gradient, maxiter = iterative_inversion, rtol = rtol, atol = atol  )
             print( "  --- CG exit code: ", exit_code)
           else: 
-            inverse, exit_code = scipy.sparse.linalg.gmres( A, gradient, x0 = gradient, maxiter = iterative_inversion, rtol = 1e-10 )
+            inverse, exit_code = scipy.sparse.linalg.gmres( A, gradient, x0 = gradient, maxiter = iterative_inversion, rtol = rtol, atol = atol  )
             print( "  --- GMRES exit code: ", exit_code )
           p_k = self.epsilon * inverse
           p_k = p_k.reshape( ( p_k.shape[0], 1 ) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
         else:
-          matrix = matrix + np.dot( vector_E, vector_E.T )
           B = np.dot( Ay, z.T )
           C = z @ np.dot( y.T, Ay ) @ z.T
           matrix = matrix + B + B.T + C
@@ -758,7 +762,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         print("|--- Time taken for the complete code block: ", np.round( interval, 2 ), "ms---|\n")
         return p_k, timings
       
-    def _precond_inversion( self, unnormalized_Hessian, gradient, iterative_inversion = - 1, optType = None ):
+    def _precond_inversion( self, unnormalized_Hessian, gradient, rtol, atol,iterative_inversion = - 1 ,  optType = None ):
         """
 
         Parameters:
@@ -816,7 +820,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         Ay = np.dot( matrix, y )
         eigenvalues = np.sum( y * Ay, axis = 0 )
         # Compute data for P = id + y*diag(values)*y.T
-        values = ( 1/np.sqrt(eigenvalues) - 1 )    # Vector of size k
+        values = ( 1/np.sqrt(eigenvalues) - 1 )# Vector of size k
         z = y * values[None,:]
         # Record timings
         end = time.time()
@@ -854,15 +858,14 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
           self.m  = matrix
           A = scipy.sparse.linalg.LinearOperator( ( self.m.shape[0], self.m.shape[1] ), matvec = _preconditioned_map ) 
           if optType == 'cg':
-            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0 = gradient, maxiter = iterative_inversion, rtol = 1e-10 )
+            inverse, exit_code = scipy.sparse.linalg.cg( A, gradient, x0 = gradient, maxiter = iterative_inversion, rtol = rtol, atol = atol )
             # print( "  --- CG exit code: ", exit_code)
           else:
-            inverse, exit_code = scipy.sparse.linalg.gmres( A, gradient, x0 = gradient, maxiter = iterative_inversion, atol = 1e-10 )
+            inverse, exit_code = scipy.sparse.linalg.gmres( A, gradient, x0 = gradient, maxiter = iterative_inversion, rtol = rtol, atol = atol )
             # print( "  --- GMRES exit code: ", exit_code)
           p_k = self.epsilon * inverse
           p_k = p_k.reshape( ( p_k.shape[0], 1 ) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
         else:
-          matrix = matrix + np.dot( vector_E, vector_E.T )
           B = np.dot( Ay, z.T )
           C = z @ np.dot( y.T, Ay ) @ z.T
           matrix = matrix + B + B.T + C
@@ -884,7 +887,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
         # print("|--- Time taken for the complete code block: ",np.round( interval,2),"ms---|\n")
         return p_k, timings
     
-    def _update( self, tol = 1e-12, maxiter = 50, iterative_inversion = - 1, version = 1, debug = False, optType = 'cg' ):
+    def _update( self, tol = 1e-12, maxiter = 50, iterative_inversion = - 1, version = 1, relative_tol = 1e-10, absolute_tol = 1e-10,  debug = False, optType = 'cg' ):
         """
 
         Parameters:
@@ -900,7 +903,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
             debug : bool
                     Implemented for versions 0, 1 and 2 for observing the eigenvalues and eigenvectors of the Hessian. Defaults to False.
             optType : str
-                      Input for the choice of iterative inversion algorithm. The following are the options:
+                      Input to choose the iterative inversion algorithm. The following are the options:
                       - Conjugate Gradient-- 'cg' : scipy.sparse.linalg.cg
                       - GMRES -- 'gmres' : scipy.sparse.linalg.gmres
                       
@@ -919,7 +922,7 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
                          Objective function values obtained over the iterations of the algorithm.
             linesearch_steps :  ndarray, shape (k,), where k is the number of iterations
                                 Different step sizes obtained by using the Armijo's rule along the iterations of the algorithm.
-            timings : ndarray, shape (k,), where k is the number of points where the timestamps are recorded
+            timings : ndarray, shape (k,), where k is the number of  timestamps are recorded
                       The timestamps recorded in different versions.
         """
         i = 1
@@ -936,44 +939,50 @@ class DampedNewton_with_precodonditioner_SemiDual_np:
               p_k, temp = self._precond_inversion_v4( self.Hessian, 
                                                       grad_f, 
                                                       iterative_inversion = iterative_inversion, 
+                                                      rtol = relative_tol,
+                                                      atol = absolute_tol,
                                                       optType = optType )
-              self.timing.append(temp)
+              self.timing.append( temp )
             elif version == 3:
               print("\n At iteration: ",i)
               p_k, temp = self._precond_inversion_v3( self.Hessian, 
                                                       grad_f, 
                                                       iterative_inversion = iterative_inversion, 
+                                                      rtol = relative_tol,
+                                                      atol = absolute_tol,
                                                       optType = optType )
-              self.timing.append(temp)
+              self.timing.append( temp )
             elif version == 2:
               print("\n At iteration: ",i)
               p_k,temp  = self._precond_inversion_v2( self.Hessian, 
                                                       grad_f, 
                                                       iterative_inversion = iterative_inversion, 
                                                       debug = debug )
-              self.timing.append(temp)
+              self.timing.append( temp )
             elif version == 1:
               print("\n At iteration: ",i)
               p_k,temp  = self._precond_inversion_v1( self.Hessian, 
                                                       grad_f, 
                                                       iterative_inversion = iterative_inversion, 
                                                       debug = debug )
-              self.timing.append(temp)
+              self.timing.append( temp )
             elif version == 0:
               print("\n At iteration: ",i)
               p_k,temp  = self._precond_inversion_v0( self.Hessian,
                                                       grad_f,
                                                       iterative_inversion = iterative_inversion,
                                                       debug = debug)
-              self.timing.append(temp)
+              self.timing.append( temp )
             else:
               #print("At iteration: ",i)
               p_k, temp = self._precond_inversion(  self.Hessian, 
                                                     grad_f, 
                                                     iterative_inversion = iterative_inversion, 
+                                                    rtol = relative_tol,
+                                                    atol = absolute_tol,
                                                     optType = optType )
-              self.timing.append(temp)
-            p_k = p_k.reshape(p_k.shape[0], )# Shape : (n,)
+              self.timing.append( temp )
+            p_k = p_k.reshape( p_k.shape[0], )# Shape : (n,)
             # Wolfe condition 1: Armijo Condition:  
             slope = np.dot( p_k, grad_f )
             alpha = 1
