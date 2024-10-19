@@ -5,7 +5,7 @@ from .Linesearch import *
 from .L_BFGS_B import *
 from .NewtonRaphson import *
 from .Newtonbasincheck import *
-from .Cuthill_Mckee import _Expcuthill_mckee
+from .Cuthill_Mckee import Expcuthill_mckee
 from .NestedDissection import *
 from .Damped_Newton import *
 from .Damped_Newton_with_preconditioning import *
