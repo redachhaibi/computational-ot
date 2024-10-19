@@ -13,11 +13,11 @@ class Newtonbasincheck:
             b : ndarray, shape (m,)
                 The probability histogram of the sample of size m.
             u : ndarray, shape (n,)
-                The initial left marginal of the coupling.
+                The initial u.
             v : ndarray, shape (m,)
-                The initial right marginal of the coupling.
+                The initial v.
             epsilon : float
-                      The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
+                      The regularization parameter.
         """
         self.K = K
         self.a = a

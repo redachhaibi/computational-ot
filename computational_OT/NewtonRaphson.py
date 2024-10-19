@@ -1,4 +1,3 @@
-from distutils import errors
 import numpy as np
 
 class NewtonRaphson:
@@ -16,7 +15,7 @@ class NewtonRaphson:
             b : ndarray, shape (m,)
                 The probability histogram of the sample of size m.
             epsilon : float
-                      The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
+                      The regularization parameter.
         """
         self.x = x
         self.K = K
@@ -114,15 +113,15 @@ class NewtonRaphson:
             print("")
         return result_stabilized
     
-    def _update( self, maxiter = 200, tol = 1e-15, debug = False ):
+    def _update( self, max_iterations = 200, tol = 1e-15, debug = False ):
         """
 
         Parameters:
         -----------
             tol : float
                   The tolerance limit for the error. Defaults to 1e-15.
-            maxiter : int 
-                      The maximum iteration for the optimization algorithm. Defaults to 200.
+            max_iterations : int 
+                             The maximum iteration for the optimization algorithm. Defaults to 200.
             debug : bool 
                     To understand the condition number of the Hessian. Defaults to False.
 
@@ -130,10 +129,10 @@ class NewtonRaphson:
         --------
         Returns a dictionary where the keys are strings and the values are ndarrays.
         The following are the keys of the dictionary and the descriptions of their values:
-            error_a : ndarray, shape (k,), where k is the number of iterations
-                  The list of error of the estimation of the measure 'a' over the iteration of the algorithm.
-            error_b : ndarray, shape (k,), where k is the number of iterations
-                  The list of error of the estimation of the measure 'b' over the iteration of the algorithm.
+            error_a : list
+                      The list of error of the estimation of the measure 'a' over the iteration of the algorithm.
+            error_b : list
+                      The list of error of the estimation of the measure 'b' over the iteration of the algorithm.
 
         """
         i = 0 
@@ -149,7 +148,7 @@ class NewtonRaphson:
             self.err_b.append( e[1] )
 
             iter_condition = ( e[0] > tol or e[1] > tol )
-            if iter_condition and i < maxiter:
+            if iter_condition and i < max_iterations:
                 i += 1
             else:
                 print( "Terminating after iteration: ", i )

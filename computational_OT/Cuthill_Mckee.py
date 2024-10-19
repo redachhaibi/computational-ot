@@ -4,7 +4,7 @@ from scipy.sparse.csgraph import reverse_cuthill_mckee
 import matplotlib.pyplot as plt
 
 
-class _Expcuthill_mckee:
+class Expcuthill_mckee:
     def __init__( self, P ):
         """
 

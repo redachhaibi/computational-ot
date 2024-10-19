@@ -9,33 +9,33 @@ print("")
 print("Launching setup...")
 # Setup
 setup(
-    name='computational_OT',
+    name = 'computational_OT',
 
-    version='0.01',
+    version = '0.01',
 
-    description='Computational aspects of optimal transport',
-    long_description=""" Computational solutions to Free Deconvolution.
+    description = 'Computational aspects of optimal transport',
+    long_description = """ Computational solutions to Free Deconvolution.
     In this module, we explore and benchmark various computational methods 
     for computing (regularized) optimal transport.
     """,
-    url='',
+    url = '',
 
-    author='Anonymous',
-    author_email='Anonymous',
+    author = 'Anonymous',
+    author_email = 'Anonymous',
 
-    license='MIT License',
+    license = 'MIT License',
 
-    install_requires=["numpy", "matplotlib", "scipy", "cvxpy", "scikit-learn"],
+    install_requires = ["numpy", "matplotlib", "scipy", "cvxpy", "scikit-learn"],
 
-    keywords='',
+    keywords = '',
 
-    packages=find_packages(),
+    packages = find_packages(),
 
-    entry_points={
+    entry_points = {
         'console_scripts': [
             'sample=sample:main',
         ],
     },
 
-    ext_modules=[],
+    ext_modules = [],
 )

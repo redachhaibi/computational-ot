@@ -2,14 +2,14 @@ import numpy as np
 import scipy
 import time
 
-class Semi_dual_dampedNewton_with_precodonditioning_np:
+class semi_dual_dampedNewton_with_precodonditioning_np:
     def __init__( self,  C, a, b, f, epsilon, rho, c, null_vector, precond_vectors, exp_log = "True" ):
         """
         
         Parameters:
         -----------
             C : ndarray, shape (n,m), 
-                It is the cost matrix between the points of the sampple point clouds.
+                It is the cost matrix between the points of the sample point clouds.
             a : ndarray, shape (n,)
                 The probability histogram of the sample of size n.
             b : ndarray, shape (m,)
@@ -21,12 +21,14 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
             c : float
                 Damping factor for the slope in the Armijo's condition.
             epsilon : float
-                      The regularization factor in the entropy regularized optimization formulation of the optimal transport problem.
+                      The regularization parameter.
             null_vector : ndarray, shape (n,)
                           The null vector of the Hessian to be used for null vector preconditioning .
-            precond_vectors : ndarray, shape (n,)
-                              The preconditioning vectors obtained from the Hessian at optimum obtained from the algorithm without any preconditioning,
+            precond_vectors : list of ndarrays, shape (n,)
+                              The stack of preconditioning vectors of shape obtained from the Hessian at optimum obtained from the algorithm without any preconditioning,
                               that is, semi-dual damped Newton with only null vector preconditioning and exact inversion.
+            exp_log : bool
+                      Indicating to use exp-log regularization or not.
         """
         self.C = C
         self.a = a
@@ -60,8 +62,8 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
             f : ndarray, shape (n,)
                 The input Kantorovich potential f.
                 
-        Returns : 
-        ---------
+        Returns: 
+        --------
             Q_semi(f) : float
                         The value of semi-dual objective function obtained by evaluating the formula Q_semi(f) = < f, a > + < g( f, C, epsilon ), b >,
                         where g( f, C, epsilon ) denotes the value of Kantorovich potential g evaluated using the Schrodinger-bridge equations between f and g.
@@ -77,7 +79,10 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
 
     def _computegradientf( self ):
         """ 
-            Compute gradient of the objective function Q_semi(.) with respect to f.
+            Returns:
+            --------
+            ndarray, shape: (n,)
+            The gradient of the objective function.
         """
         gradient = self.a * ( np.ones( self.a.shape[0] ) - np.sum( np.exp( - self.z/self.epsilon ) * self.b[None,:], axis = 1 ) )# Shape: (n,)
         return gradient
@@ -87,13 +92,8 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         Here we compute the value of the potential g by using its Schrodinger-bridge relation with the potential f.
         Parameters:
         -----------
-            a : ndarray, shape (n,)
-                The probability histogram of the sample of size n.
             H : ndarray, shape (n,m)
                 It is the matrix obtained from the difference C - f.
-            epsilon :  float
-                       The regularization factor in the entropy regularized formulation of the optimal transport problem.
-                    
         Returns:
         --------
             ndarray, shape (m,)
@@ -106,21 +106,16 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         Here we incorporate the exp-log regularization method in the computation of the potential g.
         Parameters:
         -----------
-            a : ndarray, shape (n,)
-                The probability histogram of the sample of size n.
             H : ndarray, shape (n,m)
                 It is the matrix obtained from C - f.
-            epsilon :  float
-                       The regularization factor in the entropy regularized formulation of the optimal transport problem.
 
         Returns:
         --------
             ndarray, shape (m,)
-            The value of potential g.
+            The exp-log regularized value of potential g.
 
         """
         return self._g( H - np.min( H, 0 ) ) + np.min( H, 0 )# Shape: (m,)
-            
    
     def _wolfe1( self, alpha, p, slope ):
         #Armijo Condition
@@ -129,16 +124,16 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         Parameters:
         -----------
             alpha : float  
-                    The update step size towards the ascent direction.
+                    The ascent step size.
             p : ndarray, shape (n,)
                 The ascent direction.
             slope : float
-                    It is the inner product of the gradient w.r.t f and p.
+                    It is the inner product of the gradient and p.
 
         Returns:
         --------
             alpha : float
-                    The ascent step size.
+                    The updated ascent step size.
         """
         reduction_count = 0     
         while True:   
@@ -158,10 +153,10 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         -----------
             unnormalized_Hessian :  ndarray, shape (n,n)
                                     The unnormalized Hessian.
-            gradient :  ndarray, shape (n,)
+            gradient :  ndarray, shape (n,) 
                         The gradient of the objective function with respect to potential f.
-            iterative_inversion : float
-                                  The number of iterative inversions to be performed to obtain the inverse of the Hessian followed by obtaining the ascent diorection.
+            iterative_inversion : int
+                                  The number of iterative inversions to be performed to obtain the inverse of the Hessian followed by obtaining the ascent direction.
                                   Defaults to -1, which indicates exact inversion.
             debug : bool
                     To observe the behaviour of the smallest and the largest eigenvalues of the Hessian. Defaults to False.
@@ -171,19 +166,17 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         Returns a tuple containing the optimal ascent direction vector p and the recorded timings of various steps of the algorithm. 
         The following are their descriptions:
             p : ndarray, shape (n,)
-                The optimal  ascent direction vector.
-            timings : ndarray, shape (k,)
-                      k denotes the number of points where the timestamps are recorded.
+                The optimal ascent direction vector.
+            timings : list
+                      The list of timestamps recorded.
         """
         timings = []  
         start = time.time()
         # Record list of unwinding transformations on final result
         unwinding_transformations = []
-
         # Construct modified Hessian
         diag = 1/np.sqrt( np.diag(unnormalized_Hessian).flatten() )
         self.modified_Hessian = diag[:,None] * unnormalized_Hessian * diag[None,:]
-        
         # Dummy variable to work on
         matrix = self.modified_Hessian
         # Preconditioning along null vector
@@ -263,7 +256,7 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         timings.append( interval )    
 
         print( "|--- Time taken for the complete code block: ", np.round( interval, 2 ), "ms---|\n" )
-        return p_k, timings
+        return p_k.flatten(), timings
 
     def _precond_inversion_v1( self, unnormalized_Hessian, gradient, iterative_inversion, debug ):
         """
@@ -274,8 +267,8 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
                                     The unnormalized Hessian.
             gradient :  ndarray, shape (n,)
                         The gradient of the objective function with respect to potential f.
-            iterative_inversion : float
-                                  The number of iterative inversions to be performed to obtain the inverse of the Hessian followed by obtaining the ascent diorection.
+            iterative_inversion : int
+                                  The number of iterative inversions to be performed to obtain the inverse of the Hessian followed by obtaining the ascent direction.
                                   Defaults to -1, which indicates exact inversion.
             debug : bool
                     To observe the behaviour of the smallest and the largest eigenvalues of the Hessian. Defaults to False.
@@ -285,9 +278,9 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         Returns a tuple containing the optimal ascent direction vector p and the recorded timings of various steps of the algorithm. 
         The following are their descriptions:
             p : ndarray, shape (n,)
-                The optimal  ascent direction vector.
-            timings : ndarray, shape (k,)
-                      k denotes the number of points where the timestamps are recorded.
+                The optimal ascent direction vector.
+            timings : list                                 
+                      The list of timestamps recorded.
         """
         timings = []
         start = time.time()
@@ -325,7 +318,7 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
           vector = self.precond_vectors[i]
           value  = np.dot( np.dot( matrix, vector ), vector )
           vector = vector.reshape( ( vector.shape[0], 1 ) )
-          P_matrix = P_matrix + ( 1/np.sqrt( value )-1 ) * np.dot( vector, vector.T )
+          P_matrix = P_matrix + ( 1/np.sqrt( value ) - 1 ) * np.dot( vector, vector.T )
         # end for
         unwinding_transformations.append( [ P_matrix, lambda P, x : np.dot( P, x ) ] )
         
@@ -384,7 +377,7 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         interval = 1e3 * ( end - start )
         timings.append( interval )
         print( "|--- Time taken for the complete code block: ", np.round( interval, 2 ), "ms---|\n" )
-        return p_k, timings
+        return p_k.flatten(), timings
 
     def _precond_inversion_v2( self, unnormalized_Hessian, gradient, iterative_inversion, debug ):
         """
@@ -395,8 +388,8 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
                                     The unnormalized Hessian.
             gradient :  ndarray, shape (n,)
                         The gradient of the objective function with respect to potential f.
-            iterative_inversion : float
-                                  The number of iterative inversions to be performed to obtain the inverse of the Hessian followed by obtaining the ascent diorection.
+            iterative_inversion : int
+                                  The number of iterative inversions to be performed to obtain the inverse of the Hessian followed by obtaining the ascent direction.
                                   Defaults to -1, which indicates exact inversion.
             debug : bool
                     To observe the behaviour of the smallest and the largest eigenvalues of the Hessian. Defaults to False.
@@ -406,9 +399,9 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         Returns a tuple containing the optimal ascent direction vector p and the recorded timings of various steps of the algorithm. 
         The following are their descriptions:
             p : ndarray, shape (n,)
-                The optimal  ascent direction vector.
-            timings : ndarray, shape (k,)
-                      k denotes the number of points where the timestamps are recorded.
+                The optimal ascent direction vector.
+            timings : list
+                      The list of timestamps recorded.
         """
         timings = []
         start = time.time()
@@ -531,9 +524,9 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         timings.append( interval )
 
         print( "|--- Time taken for the complete code block: ", np.round( interval, 2 ), "ms---|\n" ) 
-        return p_k, timings
+        return p_k.flatten(), timings
 
-    def _precond_inversion_v3( self, unnormalized_Hessian, gradient, rtol, atol,iterative_inversion = - 1,  optType = None ):
+    def _precond_inversion_v3( self, unnormalized_Hessian, gradient, rtol, atol, iterative_inversion = - 1,  optType = None ):
         """
 
         Parameters:
@@ -542,24 +535,25 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
                                     The unnormalized Hessian.
             gradient :  ndarray, shape (n,)
                         The gradient of the objective function with respect to potential f.
-            iterative_inversion : float
-                                  The number of iterative inversions to be performed to obtain the inverse of the Hessian followed by obtaining the ascent diorection.
+            iterative_inversion : int
+                                  The number of iterative inversions to be performed to obtain the inverse of the Hessian followed by obtaining the ascent direction.
                                   Defaults to -1, which indicates exact inversion.
             rtol :  float
-                    The value of the hyperparameter relative tolerance of the iterative inversion algorithm, which here is conjugate gradient or GMRES.
+                    The value of relative tolerance which is a hyperparameter to the iterative inversion algorithm, here it is conjugate gradient or GMRES.
             atol :  float
-                    The value of the hyperparameter absolute tolerance of the iterative inversion algorithm, which here is conjugate gradient or GMRES.
-            debug : bool
-                    To observe the behaviour of the smallest and the largest eigenvalues of the Hessian. Defaults to False.
-
+                    The value of absolute tolerance which is a hyperparameter to the iterative inversion algorithm, here it is conjugate gradient or GMRES.
+            optType : str
+                      Input for the choice of iterative inversion algorithm. The following are the options:
+                      - Conjugate Gradient-- 'cg' : scipy.sparse.linalg.cg
+                      - GMRES -- 'gmres' : scipy.sparse.linalg.gmres
         Returns:
         --------
         Returns a tuple containing the optimal ascent direction vector p and the recorded timings of various steps of the algorithm. 
         The following are their descriptions:
             p : ndarray, shape (n,)
-                The optimal  ascent direction vector.
-            timings : ndarray, shape (k,)
-                      k denotes the number of points where the timestamps are recorded.
+                The optimal ascent direction vector.
+            timings : list
+                      The list of timestamps recorded.
         """
         timings = []
         start = time.time()
@@ -589,7 +583,7 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         #  y = Preconditioning vectors as a numpy matrix n by k
         #  matrix = our matrix A to precondition
         n = self.null_vector.shape[0]
-        start0 = time.time()
+        start0 = time.time()                                     
         y = np.array( self.precond_vectors ).T # Matrix of size n by k
         # Compute eigenvalues
         Ay = np.dot( matrix, y )
@@ -663,10 +657,10 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         interval = 1e3 * ( end - start )
         timings.append( interval )
         print("|--- Time taken for the complete code block: ", np.round( interval, 2 ), "ms---|\n")
-        return p_k, timings
+        return p_k.flatten(), timings
       
     def _precond_inversion_v4( self, unnormalized_Hessian, gradient, rtol, atol, iterative_inversion = - 1, optType = None ):
-        """"
+        """
 
         Parameters:
         -----------
@@ -674,24 +668,26 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
                                     The unnormalized Hessian.
             gradient :  ndarray, shape (n,)
                         The gradient of the objective function with respect to potential f.
-            iterative_inversion : float
-                                  The number of iterative inversions to be performed to obtain the inverse of the Hessian followed by obtaining the ascent diorection.
+            iterative_inversion : int
+                                  The number of iterative inversions to be performed to obtain the inverse of the Hessian followed by obtaining the ascent direction.
                                   Defaults to -1, which indicates exact inversion.
             rtol :  float
-                    The value of the hyperparameter relative tolerance of the iterative inversion algorithm, which here is conjugate gradient or GMRES.
+                    The value of relative tolerance which is a hyperparameter to the iterative inversion algorithm, here it is conjugate gradient or GMRES.
             atol :  float
-                    The value of the hyperparameter absolute tolerance of the iterative inversion algorithm, which here is conjugate gradient or GMRES.
-            debug : bool
-                    To observe the behaviour of the smallest and the largest eigenvalues of the Hessian. Defaults to False.
+                    The value of absolute tolerance which is a hyperparameter to the iterative inversion algorithm, here it is conjugate gradient or GMRES.
+            optType : str
+                      Input for the choice of iterative inversion algorithm. The following are the options:
+                      - Conjugate Gradient-- 'cg' : scipy.sparse.linalg.cg
+                      - GMRES -- 'gmres' : scipy.sparse.linalg.gmres
 
         Returns:
         --------
         Returns a tuple containing the optimal ascent direction vector p and the recorded timings of various steps of the algorithm. 
         The following are their descriptions:
             p : ndarray, shape (n,)
-                The optimal  ascent direction vector.
-            timings : ndarray, shape (k,)
-                      k denotes the number of points where the timestamps are recorded.
+                The optimal ascent direction vector.
+            timings : list
+                      The list of timestamps recorded.
         """
         timings = []
         start = time.time()
@@ -707,6 +703,9 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         vector = vector/diag
         vector = vector/np.linalg.norm( vector )
         vector_E = vector
+        if iterative_inversion < 0:
+          vector = vector.reshape( (len(vector), 1) )
+          matrix = matrix + np.dot( vector, vector.T)
         # Transformations (Initial on gradient and final on result)
         gradient = diag[:,None] * gradient[:,None]
         unwinding_transformations.append( lambda x : diag[:,None] * x )
@@ -760,7 +759,7 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         interval = 1e3 * ( end - start2 )
         timings.append( interval )
         print( "|--- Time required for changing A to PAP: ", np.round( interval, 5 ), "ms---|" )
-        #
+        #/
         # Solve either iteratively using CG or exactly
         start3 = time.time()
         if iterative_inversion >= 0:
@@ -785,13 +784,11 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
           p_k = self.epsilon * inverse
           p_k = p_k.reshape( ( p_k.shape[0], 1 ) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
         else:
-          vector = vector.reshape( ( len(vector), 1 ) )# Reshaping for the next step, shape: (n,1)
-          matrix = matrix + np.dot( vector, vector.T )# Null vecctor preconditioning
           B = np.dot( Ay, z.T )
           C = z @ np.dot( y.T, Ay ) @ z.T
           matrix = matrix + B + B.T + C
           self.Hessian_stabilized = - matrix/self.epsilon
-          p_k = - np.linalg.solve( self.Hessian_stabilized, gradient )        
+          p_k = - np.linalg.solve( self.Hessian_stabilized, gradient )
         end = time.time()
         interval = 1e3 * (  end - start3 )
         timings.append( interval )
@@ -807,9 +804,9 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         interval = 1e3 * ( end - start )
         timings.append( interval )
         print("|--- Time taken for the complete code block: ", np.round( interval, 2 ), "ms---|\n")
-        return p_k, timings
+        return p_k.flatten(), timings
       
-    def _precond_inversion( self, unnormalized_Hessian, gradient, rtol, atol,iterative_inversion = - 1,  optType = None ):
+    def _precond_inversion( self, unnormalized_Hessian, gradient, rtol, atol, iterative_inversion = - 1,  optType = None ):
         """
 
         Parameters:
@@ -818,24 +815,26 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
                                     The unnormalized Hessian.
             gradient :  ndarray, shape (n,)
                         The gradient of the objective function with respect to potential f.
-            iterative_inversion : float
-                                  The number of iterative inversions to be performed to obtain the inverse of the Hessian followed by obtaining the ascent diorection.
+            iterative_inversion : int
+                                  The number of iterative inversions to be performed to obtain the inverse of the Hessian followed by obtaining the ascent direction.
                                   Defaults to -1, which indicates exact inversion.
-            rtol : float
-                   The value of the hyperparameter relative tolerance of the iterative inversion algorithm, which here is conjugate gradient or GMRES.
-            atol : float
-                   The value of the hyperparameter absolute tolerance of the iterative inversion algorithm, which here is conjugate gradient or GMRES.
-            debug : bool
-                    To observe the behaviour of the smallest and the largest eigenvalues of the Hessian. Defaults to False.
+            rtol :  float
+                    The value of relative tolerance which is a hyperparameter to the iterative inversion algorithm, here it is conjugate gradient or GMRES.
+            atol :  float
+                    The value of absolute tolerance which is a hyperparameter to the iterative inversion algorithm, here it is conjugate gradient or GMRES.
+            optType : str
+                      Input for the choice of iterative inversion algorithm. The following are the options:
+                      - Conjugate Gradient-- 'cg' : scipy.sparse.linalg.cg
+                      - GMRES -- 'gmres' : scipy.sparse.linalg.gmres
 
         Returns:
         --------
         Returns a tuple containing the optimal ascent direction vector p and the recorded timings of various steps of the algorithm. 
         The following are their descriptions:
             p : ndarray, shape (n,)
-                The optimal  ascent direction vector.
-            timings : ndarray, shape (k,)
-                      k denotes the number of points where the timestamps are recorded.
+                The optimal ascent direction vector.
+            timings : list
+                      The list of timestamps recorded.
         """
         timings = []
         start = time.time()
@@ -851,6 +850,10 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         vector = vector/diag
         vector = vector/np.linalg.norm( vector )
         vector_E = vector
+        if iterative_inversion < 0:
+          vector = vector.reshape( (len(vector), 1) )
+          matrix = matrix + np.dot( vector, vector.T)
+
         # Transformations (Initial on gradient and final on result)
         gradient = diag[:,None] * gradient[:,None]
         unwinding_transformations.append( lambda x : diag[:,None] * x )
@@ -926,8 +929,6 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
           p_k = self.epsilon * inverse
           p_k = p_k.reshape( ( p_k.shape[0], 1 ) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
         else:
-          vector = vector.reshape( ( len(vector), 1 ) )# Reshaping for the next step, shape: (n,1)
-          matrix = matrix + np.dot( vector, vector.T )# Null vecctor preconditioning
           B = np.dot( Ay, z.T )
           C = z @ np.dot( y.T, Ay ) @ z.T
           matrix = matrix + B + B.T + C
@@ -946,9 +947,9 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         interval = 1e3 * ( end - start )
         timings.append( interval )
         # print("|--- Time taken for the complete code block: ",np.round( interval,2),"ms---|\n")
-        return p_k, timings
+        return p_k.flatten(), timings
     
-    def _update( self, tol = 1e-12, maxiter = 100, iterative_inversion = - 1, version = 1, relative_tol = 1e-10, absolute_tol = 1e-10,  debug = False, optType = 'cg' ):
+    def _update( self, tol = 1e-12, max_iterations = 100, iterative_inversion = - 1, version = 1, relative_tol = 1e-5, absolute_tol = 1e-10,  debug = False, optType = 'cg' ):
         """
 
         Parameters:
@@ -957,14 +958,14 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
                   The tolerance limit for the error. Defaults to 1e-12.
             maxiter : int
                       The maximum iteration for the optimization algorithm. Defaults to 100.
-            iterative_inversion : float
+            iterative_inversion : int
                                   The number of iterative inversions to be performed to obtain the inverse of the Hessian followed by obtaining the ascent diorection.
                                   Defaults to -1, which indicates exact inversion.
             relative_tol :  float
                             The value of the hyperparameter relative tolerance of the iterative inversion algorithm, which here is conjugate gradient or GMRES.
             absolute_tol : float
                           The value of the hyperparameter absolute tolerance of the iterative inversion algorithm, which here is conjugate gradient or GMRES.
-            version :  int
+            version : int
                       The version of the precondioned iterative inversion to be used. Defaults to 1.
             debug : bool
                     Implemented for versions 0, 1 and 2 for observing the eigenvalues and eigenvectors of the Hessian. Defaults to False.
@@ -978,16 +979,18 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
         --------
         Returns a dictionary where the keys are strings and corresponding list of values obtained over the iteration of the algorithm.
         The following are the keys of the dictionary and the descriptions of their values:
-            potential_f : list
-                          The list of values of f obtained over the iteration of the algorithm.
-            potential_g : list
-                          The list of values of g obtained over the iteration of the algorithm.
+            potential_f : ndarray, shape: (n,)
+                          The optimal potential f.
+            potential_g : ndarray, shape: (m,)
+                          The optimal potential g.
             error : list
                     The list of numerical error observed over the iteration of the algorithm.
             objectives : list
                          The list of numerical error observed over the iteration of the algorithm.
             linesearch_steps :  list
                                 The list of ascent step size toward the ascecnt direction evaluated using the Armijo condition over the iteration of the the algorithm.
+            timings : list
+                      The list of timestamps recorded at various steps of the versions.
         """
 
         i = 1
@@ -996,8 +999,8 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
             grad_f = self._computegradientf()# Shape : (n,)
             # Compute the Hessian:
             M = self.a[:,None] * np.exp( -self.z/self.epsilon ) * np.sqrt( self.b )[None,:]# Shape : (n,m)
-            RowSum_M = np.sum( M * np.sqrt( self.b )[None,:], axis = 1 )# Shape : (n,)
-            self.Hessian = np.diag( RowSum_M ) - np.dot( M, M.T )  # Shape : (n,n)
+            self.RowSum_M = np.sum( M * np.sqrt( self.b )[None,:], axis = 1 )# Shape : (n,)
+            self.Hessian = np.diag( self.RowSum_M ) - np.dot( M, M.T )# Shape : (n,n)
             # Compute solution of Ax = b:
             if version == 4:
               print("\n At iteration: ",i)
@@ -1047,11 +1050,12 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
                                                     atol = absolute_tol,
                                                     optType = optType )
               self.timing.append( temp )
-            p_k = p_k.reshape( p_k.shape[0], )# Shape : (n,)
             # Wolfe condition 1: Armijo Condition:  
             slope = np.dot( p_k, grad_f )
             alpha = 1
+            start = time.time()
             alpha = self._wolfe1( alpha, p_k, slope )
+            end = time.time()
             self.alpha_list.append( alpha )
             # Update f and g:
             self.f = self.f + alpha * p_k
@@ -1063,13 +1067,15 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
                 self.g = self._g( self.C - self.f[:,None] )# Shape: (m,)
             self.z = ( self.C - self.f[:,None] - self.g[None,:] )# Shape : (n,m)
             P = self.a[:,None] * ( np.exp( - self.z/self.epsilon ) ) * self.b[None,:]# Shape : (n,m)
-            # Error computation:
-            self.err.append( np.linalg.norm( np.sum( P, axis = 1 ) - self.a, ord = 1 ) )
-            # Calculating objective function:
+            # Check conservation of mass
+            self.err.append(  np.linalg.norm( np.sum( P, axis = 1 ) - self.a, ord = 1 )
+                              +
+                              np.linalg.norm( np.sum( P, axis = 0 ) - self.b, ord = 1 ))
+            # Evaluating objective function after the ascent update
             value = self._objectivefunction( self.f )
             self.objvalues.append(value)
             # Check error:
-            if i< maxiter and ( self.err[-1] > tol ):
+            if i< max_iterations and ( self.err[-1] > tol ):
                 i += 1
             else:   
                 print( "Terminating after iteration: ", i )
@@ -1081,6 +1087,6 @@ class Semi_dual_dampedNewton_with_precodonditioning_np:
             "error"             : self.err,
             "objectives"        : self.objvalues,
             "linesearch_steps"  : self.alpha_list,
-            "timings"           : self.timing  
+            "timings"           : self.timing,
 
         }

@@ -1,6 +1,7 @@
 import numpy as np
-import logging
-class DampedNewton:
+import time 
+
+class damped_Newton:
       def __init__( self, K, a, b, f, g, epsilon, rho, c ):
         """
         
@@ -9,9 +10,9 @@ class DampedNewton:
           K : ndarray, shape (n,m)
               The Gibb's kernel.
           a : ndarray, shape (n,)
-                The probability histogram of the sample of size n.
+              The probability histogram of the sample of size n.
           b : ndarray, shape (m,)
-                The probability histogram of the sample of size m.
+              The probability histogram of the sample of size m.
           f : ndarray, shape (n,)
               The initial Kantorovich potential f.
           g : ndarray, shape (m,)
@@ -21,7 +22,7 @@ class DampedNewton:
           c : float
               Damping factor for the slope in the Armijo's condition.
           epsilon : float
-                    The regularization factor in the entropy regularized optimization setup of the optimal transport problem.
+                    The regularization parameter.
                     
         """
         self.K = K
@@ -42,8 +43,6 @@ class DampedNewton:
         self.err_b = [] 
         self.objvalues = []
 
-
-
       def _computegradientf( self, f ):
         """
         Computes Gradient with respect to f
@@ -52,12 +51,15 @@ class DampedNewton:
         -----------
           f : ndarray, shape (n,)
               The Kantorovich potential f.
+        Returns:
+        --------
+          ndarray, shape: (n,)
+          The gradient of the objective function w.r.t f.
         """
         u = np.exp( f/self.epsilon )
         v = np.exp( self.x[self.a.shape[0]:]/self.epsilon )
-        return self.a - ( u * np.dot( self.K,v ) )
+        return self.a - ( self.a * u * np.dot( self.K,  v  * self.b ) )
 
- 
       def _computegradientg( self, g ):
         """
         Computes Gradient with respect to g
@@ -66,11 +68,15 @@ class DampedNewton:
         -----------
           g : ndarray, shape (m,)
               The Kantorovich potential g.
+        Returns:
+        --------
+          mdarray, shape: (m,)
+          The gradient of the objective function w.r.t. g.
 
         """
         u = np.exp( self.x[:self.a.shape[0]]/self.epsilon )
         v = np.exp( g/self.epsilon )
-        return self.b - ( v * np.dot( self.K.T, u ) )
+        return self.b - ( ( self.b * v ) * np.dot( self.K.T, u * self.a ) )
 
       def _objectivefunction( self, x ):
         """
@@ -85,35 +91,34 @@ class DampedNewton:
           Q(f,g) :  float
                     The value of objective function obtained by evaluating the formula Q(f,g) = < f, a > + < g, b > - epsilon*< u, Kv >,
                     where u = exp( f/epsilon ), v = exp( g/epsilon ). 
-          
         """
         f = x[:self.a.shape[0]]
         g = x[self.a.shape[0]:]
-        regularizer = - self.epsilon * np.dot( np.exp( f/self.epsilon ).T, np.dot( self.K, np.exp( g/self.epsilon ) ) )
-        return np.dot( f.T, self.a ) + np.dot( g.T, self.b ) + regularizer
+        regularizer = - self.epsilon * ( np.dot( self.a * np.exp( f/self.epsilon ).T, np.dot( self.K, np.exp( g/self.epsilon ) * self.b ) ) - 1 )
+        Q = np.dot( f.T, self.a ) + np.dot( g.T, self.b ) + regularizer
+        return Q
 
       def _wolfe1( self, alpha, p, slope ):
         #Armijo Condition
         """
 
-        Parameters:
+        Parameters:           
         -----------
             alpha : float
-                    The update step size.
+                    The ascent step size, initialized to 1.
             p : ndarray, shape (n,)
                 The optimal direction.
             slope : float
                     It is the inner product of the gradient and p.
-
         Returns:
         --------
             alpha : float
-                    The updated step size.
+                    The updated ascent step size.
         """
         reduction_count = 0           
         while True:   
-            condition = self._objectivefunction( self.x + alpha*p ) < self._objectivefunction( self.x ) + self.c * alpha * slope
-            if condition or np.isnan( self._objectivefunction( self.x + alpha*p ) ):
+            condition = self._objectivefunction( self.x + alpha * p ) < self._objectivefunction( self.x ) + self.c * alpha * slope
+            if condition or np.isnan( self._objectivefunction( self.x + alpha * p ) ):
                 alpha = self.rho * alpha                                                     
                 reduction_count += 1
             else:
@@ -122,48 +127,50 @@ class DampedNewton:
         
 
 
-      def _update( self, tol = 1e-12, maxiter = 100 ):
+      def _update( self, tol = 1e-12, max_iterations = 100, debug = False ):
         """
 
         Parameters:
         ----------
             tol : float
                   The tolerance limit for the error. Defaults to 1e-12.
-            maxiter : int 
-                      The maximum iteration for the optimization algorithm. Defaults to 100.
+            max_iterations : int 
+                             The maximum iteration for the optimization algorithm. Defaults to 100.
         Returns:
         --------
-        Returns a dictionary where the keys are strings and the values are ndarrays.
+        Returns a dictionary where the keys are strings and the values are ndarrays or lists.
         The following are the keys of the dictionary and the descriptions of their values:
             potential_f : ndarray, shape (n,)
                           The optimal Kantorovich potential f.
             potential_g : ndarray, shape (m,)
                           The optimal Kantorovich potential g.
-            error : ndarray, shape (k,), where k is the number of iterations
-                    Errors observed over the iteration of the algorithm.
-            objectives : ndarray, shape (k,), where k is the number of iterations
-                         Objective function values obtained over the iterations of the algorithm.
-            linesearch_steps :  ndarray, shape (k,), where k is the number of iterations
-                                Different step sizes obtained by using the Armijo's rule along the iterations of the algorithm.
+            error_a : list
+                      The list of numerical errors in estimating the prabability histogram a over the iteration of the algorithm.
+            error_b : list
+                      The list of numerical errors observed in estimating the probability histogram b over the iteration of the algorithm.
+            objective_values  : list
+                                The list of objective values observed after each ascent update.                        
+            linesearch_steps  : list
+                                The list of different step sizes obtained by using the Armijo's rule.
         """
         i = 0
         while True :
-            
+            # Compute gradients
             grad_f = self._computegradientf( self.x[:self.a.shape[0]] )
             grad_g = self._computegradientg( self.x[self.a.shape[0]:] )
-        
             gradient = np.concatenate( ( grad_f, grad_g ), axis = None )
-            
-            
             # Compute Hessian
             u = np.exp( self.x[:self.a.shape[0]]/self.epsilon )
             v = np.exp( self.x[self.a.shape[0]:]/self.epsilon )
-            r1 = u * np.dot( self.K,v )
-            r2 = v * np.dot( self.K.T, u )
+                        
+            r1 = ( self.a * u * np.dot( self.K,  v  * self.b ) )
+            r2 = ( ( self.b * v ) * np.dot( self.K.T, u * self.a ) )
+            # r1 = u * np.dot( self.K,v )
+            # r2 = v * np.dot( self.K.T, u )
             # P  = u*self.K*(v.T) # WRONG AGAIN: DANGEROUS CODE!!
             u = u.reshape( u.shape[0], )
             v = v.reshape( v.shape[0], )
-            P = u[:,None] * self.K * v[None,:]
+            P = self.a[:,None] * u[:,None] * self.K * v[None,:] * self.b[None,:]
 
             A = np.diag( np.array( r1.reshape( r1.shape[0], ) ) )
             B = P
@@ -172,7 +179,7 @@ class DampedNewton:
             result = np.vstack( ( np.hstack( ( A, B ) ), np.hstack( ( C ,D ) ) ) )
 
             self.Hessian = - result/self.epsilon
-
+           
             # Debug
             # if debug:
             #   scaling = 1.0/np.mean( np.diag(self.Hessian) )
@@ -187,7 +194,7 @@ class DampedNewton:
             #   #
             #   print( "--- Unstabilized")
             #   print( "List of --smallest eigenvalues: ", eig[:3])
-            #   print( "        |-largest  eigenvalues: ", eig[-3:])
+            #   print( "        |-largest  eigenvalues: ", eig[-3:]) , 
             #   print( "        |- sum of  eigenvalues: ", eig[:3]+np.flip(eig[-3:]) )
               # print( "Null vector vs empirical:", np.dot(self.null_vector.flatten(), empirical_null_vector.flatten()) )
               # print( "Gradient along -- 0  :", np.dot(gradient.flatten(), v[:,0])/np.linalg.norm(gradient) )
@@ -199,9 +206,23 @@ class DampedNewton:
               #print( "Null vector vs p_k      :", np.dot(self.null_vector.flatten(), p_k.flatten()) )
 
             
-            
+            # scaling = 1.0/np.mean( np.diag(self.Hessian) )
+            # eig, v = np.linalg.eigh( self.Hessian * scaling )
+            # sorting_indices = np.argsort(eig)
+            # eig = eig[sorting_indices]
+            # v   = v[:, sorting_indices]
+            # #
+            # empirical_null_vector = v[:,0]
+            # empirical_null_vector = np.reshape( empirical_null_vector, (len(empirical_null_vector),1) )
+            # self.reg_matrix = np.dot( empirical_null_vector, empirical_null_vector.T)
+            # #
+            # print( "--- Unstabilized")
+            # print( "List of --smallest eigenvalues: ", eig[:3])
+            # print( "        |-largest  eigenvalues: ", eig[-3:]) , 
+            # print( "        |- sum of  eigenvalues: ", eig[:3]+np.flip(eig[-3:]) )
+
             # Inflating the corresponding direction
-            mean_eig = - ( 0.5 * np.mean( r1 ) + 0.5 * np.mean( r2 ) )/self.epsilon
+            mean_eig = -( 0.5 * np.mean( r1 ) + 0.5*np.mean( r2 ) )/self.epsilon
             self.Hessian_stabilized = self.Hessian + mean_eig * self.reg_matrix
             # eig, v = np.linalg.eigh(self.Hessian_stabilized)
             # sorted_indices = np.argsort(eig)
@@ -215,29 +236,45 @@ class DampedNewton:
             
             # Debug
             # if debug:
-            #   scaling = 1.0/np.mean( np.diag(self.Hessian_stabilized) )
-            #   eig, v = np.linalg.eigh( self.Hessian_stabilized * scaling )
-            #   sorting_indices = np.argsort(eig)
-            #   eig = eig[sorting_indices]
-            #   v   = v[:, sorting_indices]
-            #   #
-            #   empirical_null_vector = v[:,0]
-            #   empirical_null_vector = np.reshape( empirical_null_vector, (len(empirical_null_vector),1) )
-            #   self.reg_matrix = np.dot( empirical_null_vector, empirical_null_vector.T)
-            #   #
-            #   print( "--- Stabilized")
-            #   print( "List of --smallest eigenvalues:mean_eig ", eig[:3])
-            #   print( "Null vector vs empirical:", np.dot(self.null_vector.flatten(), empirical_null_vector.flatten()) )
-            #   print( "")
+            # scaling = 1.0/np.mean( np.diag(self.Hessian_stabilized) )
+            # eig, v = np.linalg.eigh( self.Hessian_stabilized * scaling )
+            # sorting_indices = np.argsort(eig)
+            # eig = eig[sorting_indices]
+            # v   = v[:, sorting_indices]
+            # #
+            # empirical_null_vector = v[:,0]
+            # empirical_null_vector = np.reshape( empirical_null_vector, (len(empirical_null_vector),1) )
+            # self.reg_matrix =  np.dot( empirical_null_vector, empirical_null_vector.T)
+            # #
+            # print( "--- Stabilized")
+            # print( "List of --smallest eigenvalues:mean_eig ", eig[:3])
+            # print( "        |-largest  eigenvalues: ", eig[-3:]) 
+            # print( "Null vector vs empirical:", np.dot(self.null_vector.flatten(), empirical_null_vector.flatten()) )
+            # print( "")
               #print( "Null vector vs gradient :", np.dot(self.null_vector.flatten(), gradient.flatten()) )
               #print( "Null vector vs p_k      :", np.dot(self.null_vector.flatten(), p_k.flatten()) )
             # eig,v = np.linalg.eigh(self.Hessian_stabilized)
-            try:
-              p_k = - np.linalg.solve( self.Hessian_stabilized,gradient )
-            except:
-              print( "Inverse does not exist at epsilon:", self.epsilon )
-              return np.zeros( 6 )
+            # if self.epsilon < 0.02:
+            #   eig, v = np.linalg.eigh( self.Hessian_stabilized )
+            #   sorted_indices = np.argsort( eig )
+            #   v = v[ :,sorted_indices ]
+            #   # print( len( np.where( eig < 1e-1000 )[0] ) )
+            #   p = len( np.where( eig < 1e-1000 )[0] ) # Number of eigenvalue less than one
+            #   # print( "Condition number: ", np.max(eig)/np.min(eig) )
+            #   # Regularizig the Hessian with the eigenvectors corresponding to eigenvalues less than 0
+            #   for eigv in v[:p]:
+            #       self.Hessian_stabilized = self.Hessian_stabilized + mean_eig * np.dot( eigv[:, None] , eigv[:, None].T )
+            #   # # Regularizig the Hessian with the eigenvectors corresponding to eigenvalues greater than 1
+            #   # q = len( np.where( eig > 2  )[0] )# Number of eigenvalues greater than 1
+            #   # if q > 1:
+            #   #     for eigv in v[-q:]:
+            #   #         self.Hessian_stabilized = self.Hessian_stabilized - mean_eig * np.dot( eigv[:, None] , eigv[:, None].T )
 
+            try:
+              p_k = - np.linalg.solve( self.Hessian_stabilized, gradient )
+            except np.linalg.LinAlgError as e:
+                print(f"An error occurred: {e}")              
+                return -1
             p_k = p_k - self.null_vector.flatten() * np.dot( self.null_vector.flatten(), p_k.flatten() )
             # 
             # if debug:
@@ -248,42 +285,36 @@ class DampedNewton:
 
             # Stacked
             p_k_stacked = np.concatenate( ( p_k[:self.a.shape[0]], p_k[self.a.shape[0]:] ), axis = None )
- 
             # Wolfe Condition 1: Armijo Condition  
             slope = np.dot( p_k.T, gradient )
             alpha = 1
             alpha = self._wolfe1( alpha, p_k_stacked, slope )
             self.alpha.append( alpha )
-
-            # Update x = f and g
+            # print( "Time to compute the alpha: ", 1e3 * ( end - start ), " alpha: ", alpha )  
+            # Updating the vector stack containing f and g towards the ascent direction
             self.x = self.x + alpha * p_k_stacked
-          
-            # error computation 1
-            s = np.exp( self.x[:self.a.shape[0]]/self.epsilon ) * np.dot( self.K, np.exp( self.x[self.a.shape[0]:]/self.epsilon ) )
+            # Error computation 1
+            s = self.a * np.exp( self.x[:self.a.shape[0]]/self.epsilon ) * np.dot( self.K, np.exp( self.x[self.a.shape[0]:]/self.epsilon ) * self.b  )
             self.err_a.append( np.linalg.norm( s - self.a ) )
-
-            # error computation 2
-            r = np.exp( self.x[self.a.shape[0]:]/self.epsilon ) * np.dot( self.K .T, np.exp(self.x[:self.a.shape[0]]/self.epsilon ) )
+            # Error computation 2
+            r = self.b * np.exp( self.x[self.a.shape[0]:]/self.epsilon ) * np.dot( self.K .T, np.exp(self.x[:self.a.shape[0]]/self.epsilon ) * self.a )
             self.err_b.append( np.linalg.norm( r - self.b ) )
-
-            # Calculating Objective values
+            # Evaluating objective function after the ascent update
             value = self._objectivefunction( self.x )
             self.objvalues.append( value )
-            
-            if i < maxiter and ( self.err_a[-1] > tol or self.err_b[-1] > tol ) :
-                 i += 1
+            if i < max_iterations and ( self.err_a[-1] > tol or self.err_b[-1] > tol ) :
+                i += 1
             else:
                 print( "Terminating after iteration: ", i )
                 break
       
         # end for
         return {
-          "potential_f"      : self.x[:self.a.shape[0]],
-          "potential_g"      : self.x[self.a.shape[0]:],
+          "potential_f"      : self.x[:self.a.shape[0]] + self.epsilon * np.log( self.a ),
+          "potential_g"      : self.x[self.a.shape[0]:] + self.epsilon * np.log( self.b ),
           "error_a"          : self.err_a,
           "error_b"          : self.err_b,
-          "objectives"       : self.objvalues,
+          "objective_values" : self.objvalues,
           "linesearch_steps" : self.alpha       
         }    
         
-#Footer

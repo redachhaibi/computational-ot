@@ -1,13 +1,12 @@
 import numpy as np
-
-class Semi_dual_dampedNewton_np:
+class semi_dual_dampedNewton_np:
     def __init__( self, C, a, b, f, epsilon, rho, c, exp_log = 'True' ):
         """
         
         Parameters:
         -----------
             C : ndarray, shape (n,m), 
-                It is the cost matrix between the points of the sampple point clouds.
+                It is the cost matrix between the points of the sample point clouds.
             a : ndarray, shape (n,)
                 The probability histogram of the sample of size n.
             b : ndarray, shape (m,)
@@ -19,7 +18,9 @@ class Semi_dual_dampedNewton_np:
             c : float
                 Damping factor for the slope in the Armijo's condition.
             epsilon : float
-                      The regularization factor in the entropy regularized formulation of the optimal transport problem.
+                      The regularization parameter.
+            exp_log : bool
+                      Indicating to use exp-log regularization or not.
         """
         self.C = C
         self.a = a
@@ -51,8 +52,8 @@ class Semi_dual_dampedNewton_np:
             f : ndarray, shape (n,)
                 The input Kantorovich potential f.
                 
-        Returns : 
-        ---------
+        Returns: 
+        --------
             Q_semi(f) : float
                         The value of semi-dual objective function obtained by evaluating the formula Q_semi(f) = < f, a > + < g( f, C, epsilon ), b >,
                         where g( f, C, epsilon ) denotes the value of Kantorovich potential g evaluated using the Schrodinger-bridge equations between f and g.
@@ -68,7 +69,10 @@ class Semi_dual_dampedNewton_np:
 
     def _computegradientf( self ):
         """ 
-            Compute gradient of the objective function Q_semi(.) with respect to f.
+            Returns:
+            --------
+            ndarray, shape: (n,)
+            The gradient of the objective function.
         """
         gradient = self.a * ( np.ones( self.a.shape[0] ) - np.sum( np.exp( - self.z/self.epsilon ) * self.b[None,:], axis = 1 ) )# Shape: (n,)
         return gradient
@@ -78,13 +82,8 @@ class Semi_dual_dampedNewton_np:
         Here we compute the value of the potential g by using its Schrodinger-bridge relation with the potential f.
         Parameters:
         -----------
-            a : ndarray, shape (n,)
-                The probability histogram of the sample of size n.
             H : ndarray, shape (n,m)
                 It is the matrix obtained from the difference C - f.
-            epsilon :  float
-                       The regularization factor in the entropy regularized formulation of the optimal transport problem.
-                    
         Returns:
         --------
             ndarray, shape (m,)
@@ -97,17 +96,13 @@ class Semi_dual_dampedNewton_np:
         Here we incorporate the exp-log regularization method in the computation of the potential g.
         Parameters:
         -----------
-            a : ndarray, shape (n,)
-                The probability histogram of the sample of size n.
             H : ndarray, shape (n,m)
                 It is the matrix obtained from C - f.
-            epsilon :  float
-                       The regularization factor in the entropy regularized formulation of the optimal transport problem.
 
         Returns:
         --------
             ndarray, shape (m,)
-            The value of potential g.
+            The exp-log regularized value of potential g.
 
         """
         return self._g( H - np.min( H, 0 ) ) + np.min( H, 0 )# Shape: (m,)
@@ -120,16 +115,15 @@ class Semi_dual_dampedNewton_np:
         Parameters:
         -----------
             alpha : float  
-                    The update step size towards the ascent direction.
+                    The ascent step size.
             p : ndarray, shape (n,)
                 The ascent direction.
             slope : float
-                    It is the inner product of the gradient w.r.t f and p.
-
+                    It is the inner product of the gradient and p.
         Returns:
         --------
             alpha : float
-                    The ascent step size.
+                    The updated ascent step size.
         """
         reduction_count = 0     
         while True:   
@@ -141,29 +135,29 @@ class Semi_dual_dampedNewton_np:
                 break
         return alpha
         
-    def _update( self, tol = 1e-12, maxiter = 100 ):
+    def _update( self, tol = 1e-12, max_iterations = 100 ):
         """
         Here perform the iterations of the semi-dual damped Newton algorithm.
         Parameters:
         ----------
             tol : float
                   The tolerance for the numerical error. Defaults to 1e-12.
-            maxiter : int 
-                      The maximum number of iteration for the algorithm. Defaults to 100.
+            max_iterations : int 
+                             The maximum number of iteration for the algorithm. Defaults to 100.
         Returns:
         --------
         Returns a dictionary where the keys are strings and corresponding list of values obtained over the iteration of the algorithm.
         The following are the keys of the dictionary and the descriptions of their values:
-            potential_f : list
-                          The list of values of f obtained over the iteration of the algorithm.
-            potential_g : list
-                          The list of values of g obtained over the iteration of the algorithm.
-            error :  list
+            potential_f : ndarray, shape: (n,)
+                          The optimal potential f.
+            potential_g : ndarray, shape: (m,)
+                          The optimal potential g.
+            error : list
                     The list of numerical error observed over the iteration of the algorithm.
-            objectives : list
-                         The list of numerical error observed over the iteration of the algorithm.
-            linesearch_steps :  list
-                                The list of ascent step size toward the ascecnt direction evaluated using the Armijo condition over the iteration of the the algorithm.
+            objective_values : list
+                               The list of objective values observed after each ascent update.
+            linesearch_steps : list
+                               The list of ascent step size toward the ascecnt direction evaluated using the Armijo condition over the iteration of the the algorithm.
         """
         i = 1
         while True: 
@@ -180,7 +174,7 @@ class Semi_dual_dampedNewton_np:
                 p_k = - np.linalg.solve( self.Hessian_stabilized, grad_f )  
             except np.linalg.LinAlgError as e:
                 print(f"An error occurred: {e}")
-                return np.zeros(5)
+                return -1
             p_k = p_k - self.null_vector.flatten() * np.dot( self.null_vector.flatten(), p_k )# Shape: (n,)
             # Wolfe condition 1: Armijo Condition:      
             slope = np.dot( p_k, grad_f )
@@ -195,16 +189,18 @@ class Semi_dual_dampedNewton_np:
             else:
                 # Without exp-log regularization
                 self.g = self._g( self.C - self.f[:,None] )# Shape: (m,)
-           # Evaluating the coupling:
+            # Computing the coupling:
             self.z = ( self.C - self.f[:,None] - self.g[None,:] )# Shape: (n,m)
             P = self.a[:,None] * ( np.exp( - self.z/self.epsilon ) ) * self.b[None,:]# Shape: (n,m)
-            # Error computation:
-            self.err.append( np.linalg.norm( np.sum( P, axis = 1 ) - self.a, ord = 1 ) )
-            # Calculating objective function:
+            # Check conservation of mass
+            self.err.append(    np.linalg.norm( np.sum( P, axis = 1 ) - self.a, ord = 1 )
+                                +
+                                np.linalg.norm( np.sum( P, axis = 0 ) - self.b, ord = 1 ))
+            # Evaluating objective function after the ascent update
             value = self._objectivefunction( self.f )
             self.objvalues.append( value )
             # Check error:
-            if i < maxiter and ( self.err[-1] > tol ):
+            if i < max_iterations and ( self.err[-1] > tol ):
                 i += 1
             else:   
                 print( "Terminating after iteration: ", i )
@@ -214,6 +210,6 @@ class Semi_dual_dampedNewton_np:
             "potential_f"       : self.f + self.epsilon * np.log( self.a ),
             "potential_g"       : self.g + self.epsilon * np.log( self.b ),
             "error"             : self.err,
-            "objectives"        : self.objvalues,
+            "objective_values"  : self.objvalues,
             "linesearch_steps"  : self.alpha_list
         }
