@@ -40,18 +40,12 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
         self.null_vector = null_vector
         self.precond_vectors = precond_vectors
         self.exp_log = exp_log
-        if self.exp_log :
-          # With exp-log regularization
-          self.g = self._explog_g( self.C - self.f[:,None] )# Shape: (m,)
-        else:
-          # Without exp-log regularization
-          self.g = self._g( self.C - self.f[:,None] )# Shape: (m,)
         self.alpha_list = []
         self.err = []
         self.objvalues = [] 
         self.timing = []
         self.out = []
-        self.g = self._explog_g( self.C - self.f[:,None] )# Shape: (m,)
+        self.g = self._get_g( self.C - self.f[:,None] )# Shape: (m,)
         self.z = self.C - self.f[:,None] - self.g[None,:]# Shape: (n,m)
 
     def _objectivefunction( self, f ) :
@@ -68,12 +62,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
                         The value of semi-dual objective function obtained by evaluating the formula Q_semi(f) = < f, a > + < g( f, C, epsilon ), b >,
                         where g( f, C, epsilon ) denotes the value of Kantorovich potential g evaluated using the Schrodinger-bridge equations between f and g.
         """
-        if self.exp_log:
-          # With exp-log regularization
-          g = self._explog_g( self.C - f[:,None] )# Shape: (m,)
-        else:
-          # Without exp-log regularization
-          g = self._g( self.C - f[:,None] )# Shape: (m,)
+        g = self._get_g( self.C - f[:,None] )
         Q_semi = np.dot( f, self.a ) + np.dot( g, self.b )
         return Q_semi
 
@@ -86,6 +75,26 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
         """
         gradient = self.a * ( np.ones( self.a.shape[0] ) - np.sum( np.exp( - self.z/self.epsilon ) * self.b[None,:], axis = 1 ) )# Shape: (n,)
         return gradient
+    
+    def _get_g( self, H ):
+      """ 
+        Here we computing g.
+        Parameters:
+        -----------
+            H : ndarray, shape (n,m)
+                It is the matrix obtained from the difference C - f.
+        Returns:
+        --------
+            ndarray, shape (m,)
+            The value of potential g.
+      """
+      if self.exp_log :
+        # With exp-log regularization
+        g = self._explog_g( H )# Shape: (m,)
+      else:
+        # Without exp-log regularization
+        g = self._g( H )# Shape: (m,)
+      return g
     
     def _g( self, H ):
         """
@@ -352,7 +361,6 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
           accumulator = gradient
           inverse = gradient
           delta   = - ( matrix - np.identity( n ) ) # Unipotent part
-          
           for i in range(iterative_inversion):
             accumulator = np.dot( delta, accumulator )
             inverse = inverse + accumulator
@@ -784,6 +792,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
           p_k = self.epsilon * inverse
           p_k = p_k.reshape( ( p_k.shape[0], 1 ) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
         else:
+          # Preconditioning for exact inversion
           B = np.dot( Ay, z.T )
           C = z @ np.dot( y.T, Ay ) @ z.T
           matrix = matrix + B + B.T + C
@@ -852,8 +861,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
         vector_E = vector
         if iterative_inversion < 0:
           vector = vector.reshape( (len(vector), 1) )
-          matrix = matrix + np.dot( vector, vector.T)
-
+          matrix = matrix + np.dot( vector, vector.T )                                                    
         # Transformations (Initial on gradient and final on result)
         gradient = diag[:,None] * gradient[:,None]
         unwinding_transformations.append( lambda x : diag[:,None] * x )
@@ -929,6 +937,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
           p_k = self.epsilon * inverse
           p_k = p_k.reshape( ( p_k.shape[0], 1 ) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
         else:
+          # Preconditioning for exact inverse 
           B = np.dot( Ay, z.T )
           C = z @ np.dot( y.T, Ay ) @ z.T
           matrix = matrix + B + B.T + C
@@ -999,8 +1008,8 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
             grad_f = self._computegradientf()# Shape : (n,)
             # Compute the Hessian:
             M = self.a[:,None] * np.exp( -self.z/self.epsilon ) * np.sqrt( self.b )[None,:]# Shape : (n,m)
-            self.RowSum_M = np.sum( M * np.sqrt( self.b )[None,:], axis = 1 )# Shape : (n,)
-            self.Hessian = np.diag( self.RowSum_M ) - np.dot( M, M.T )# Shape : (n,n)
+            RowSum_M = np.sum( M * np.sqrt( self.b )[None,:], axis = 1 )# Shape : (n,)
+            self.Hessian = np.diag( RowSum_M ) - np.dot( M, M.T )# Shape : (n,n)
             # Compute solution of Ax = b:
             if version == 4:
               print("\n At iteration: ",i)
@@ -1059,12 +1068,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
             self.alpha_list.append( alpha )
             # Update f and g:
             self.f = self.f + alpha * p_k
-            if self.exp_log :
-                # With exp-log regularization
-                self.g = self._explog_g( self.C - self.f[:,None] )# Shape: (m,)
-            else:
-                # Without exp-log regularization
-                self.g = self._g( self.C - self.f[:,None] )# Shape: (m,)
+            self.g = self._get_g( self.C - self.f[:,None] )# Shape: (m,)
             self.z = ( self.C - self.f[:,None] - self.g[None,:] )# Shape : (n,m)
             P = self.a[:,None] * ( np.exp( - self.z/self.epsilon ) ) * self.b[None,:]# Shape : (n,m)
             # Check conservation of mass

@@ -36,12 +36,7 @@ class semi_dual_dampedNewton_np:
         null_vector = np.hstack( np.ones( self.a.shape[0] ) )/np.sqrt( self.a.shape[0] )
         self.null_vector = np.reshape( null_vector, ( self.a.shape[0], 1 ) )# Shape: (n,1)
         self.reg_matrix = np.dot( self.null_vector, self.null_vector.T )# Shape: (n,n)
-        if self.exp_log :
-          # With exp-log regularization
-          self.g = self._explog_g( self.C - self.f[:,None] )# Shape: (m,)
-        else:
-          # Without exp-log regularization
-          self.g = self._g( self.C - self.f[:,None] )# Shape: (m,)
+        self.g = self._get_g( self.C - self.f[:,None] )
         self.z = self.C - self.f[:,None] -  self.g[None,:]# Shape: (n,m)
 
     def _objectivefunction( self, f ) :
@@ -58,12 +53,7 @@ class semi_dual_dampedNewton_np:
                         The value of semi-dual objective function obtained by evaluating the formula Q_semi(f) = < f, a > + < g( f, C, epsilon ), b >,
                         where g( f, C, epsilon ) denotes the value of Kantorovich potential g evaluated using the Schrodinger-bridge equations between f and g.
         """
-        if self.exp_log:
-          # With exp-log regularization
-          g = self._explog_g( self.C - f[:,None] )# Shape: (m,)
-        else:
-          # Without exp-log regularization
-          g = self._g( self.C - f[:,None] )# Shape: (m,)
+        g = self._get_g( self.C - f[:,None] )
         Q_semi = np.dot( f, self.a ) + np.dot( g, self.b )
         return Q_semi
 
@@ -77,6 +67,26 @@ class semi_dual_dampedNewton_np:
         gradient = self.a * ( np.ones( self.a.shape[0] ) - np.sum( np.exp( - self.z/self.epsilon ) * self.b[None,:], axis = 1 ) )# Shape: (n,)
         return gradient
     
+    def _get_g( self, H ):
+      """
+        Here we computing g.
+        Parameters:
+        -----------
+            H : ndarray, shape (n,m)
+                It is the matrix obtained from the difference C - f.
+        Returns:
+        --------
+            ndarray, shape (m,)
+            The value of potential g.
+      """
+      if self.exp_log :
+        # With exp-log regularization
+        g = self._explog_g( H )# Shape: (m,)
+      else:
+        # Without exp-log regularization
+        g = self._g( H )# Shape: (m,)
+      return g
+            
     def _g( self, H ):
         """
         Here we compute the value of the potential g by using its Schrodinger-bridge relation with the potential f.
@@ -167,7 +177,7 @@ class semi_dual_dampedNewton_np:
             M = self.a[:,None] * np.exp( - self.z/self.epsilon ) * np.sqrt( self.b )[None,:]# Shape: (n,m)
             RowSum_M = np.sum( M * np.sqrt( self.b )[None,:], 1 )# Row sum, shape: (n,)
             self.Hessian = -( np.diag( RowSum_M ) - np.dot( M, M.T ) )/self.epsilon# Shape: (n,m)
-            mean_eig =  -( np.mean( np.diag( RowSum_M ) ) )/self.epsilon
+            mean_eig = -( np.mean( np.diag( RowSum_M ) ) )/self.epsilon
             # Preconditioning the Hessian using its null vector with the factor being the mean of eigenvalues of the Hessian 
             self.Hessian_stabilized = self.Hessian + mean_eig * self.reg_matrix# Shape: (n,m)
             try:    
@@ -183,12 +193,7 @@ class semi_dual_dampedNewton_np:
             self.alpha_list.append( alpha )
             # Update f and g:
             self.f = self.f + alpha * p_k
-            if self.exp_log :
-                # With exp-log regularization
-                self.g = self._explog_g( self.C - self.f[:,None] )# Shape: (m,)
-            else:
-                # Without exp-log regularization
-                self.g = self._g( self.C - self.f[:,None] )# Shape: (m,)
+            self.g = self._get_g( self.C - self.f[:,None] )
             # Computing the coupling:
             self.z = ( self.C - self.f[:,None] - self.g[None,:] )# Shape: (n,m)
             P = self.a[:,None] * ( np.exp( - self.z/self.epsilon ) ) * self.b[None,:]# Shape: (n,m)
