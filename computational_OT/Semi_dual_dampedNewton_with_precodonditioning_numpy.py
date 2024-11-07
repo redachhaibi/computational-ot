@@ -62,7 +62,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
                         The value of semi-dual objective function obtained by evaluating the formula Q_semi(f) = < f, a > + < g( f, C, epsilon ), b >,
                         where g( f, C, epsilon ) denotes the value of Kantorovich potential g evaluated using the Schrodinger-bridge equations between f and g.
         """
-        g = self._get_g( self.C - f[:,None] )
+        g = self._get_g( self.C - f[:,None] )# Shape: (m,)
         Q_semi = np.dot( f, self.a ) + np.dot( g, self.b )
         return Q_semi
 
@@ -70,7 +70,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
         """ 
             Returns:
             --------
-            ndarray, shape: (n,)
+            ndarray, shape (n,)
             The gradient of the objective function.
         """
         gradient = self.a * ( np.ones( self.a.shape[0] ) - np.sum( np.exp( - self.z/self.epsilon ) * self.b[None,:], axis = 1 ) )# Shape: (n,)
@@ -116,7 +116,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
         Parameters:
         -----------
             H : ndarray, shape (n,m)
-                It is the matrix obtained from C - f.
+                It is the matrix obtained from the difference C - f.
 
         Returns:
         --------
@@ -450,7 +450,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
         Ay = np.dot( matrix, y )
         eigenvalues = np.sum( y * Ay, axis = 0 )
         # Compute P_matrix = id + y*diag(values)*y.T
-        values = ( ( 1/(np.sqrt(eigenvalues) ) ) - 1 )    # Vector of size k
+        values = ( ( 1/(np.sqrt(eigenvalues) ) ) - 1 )# Vector of size k
         z = y * values[None,:]
         P_matrix = ( 1/np.sqrt(2) ) * ( np.identity( n ) + np.dot( z, y.T ) )
         # Old version
@@ -597,7 +597,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
         Ay = np.dot( matrix, y )
         eigenvalues = np.sum( y * Ay, axis = 0 )
         # Compute P_matrix = id + y*diag(values)*y.T
-        values = ( 1/np.sqrt(eigenvalues) - 1 )    # Vector of size k
+        values = ( 1/np.sqrt(eigenvalues) - 1 )# Vector of size k
         z = y * values[None,:]
         P_matrix = ( np.identity( n ) + np.dot( z, y.T ) )
         # Done
@@ -706,14 +706,10 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
         self.modified_Hessian = diag[:,None] * unnormalized_Hessian * diag[None,:]
         # Dummy variable to work on
         matrix = self.modified_Hessian
-        # Preconditioning along null vector
         vector = self.null_vector# Shape: (n,)
         vector = vector/diag
         vector = vector/np.linalg.norm( vector )
         vector_E = vector
-        if iterative_inversion < 0:
-          vector = vector.reshape( (len(vector), 1) )
-          matrix = matrix + np.dot( vector, vector.T)
         # Transformations (Initial on gradient and final on result)
         gradient = diag[:,None] * gradient[:,None]
         unwinding_transformations.append( lambda x : diag[:,None] * x )
@@ -767,7 +763,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
         interval = 1e3 * ( end - start2 )
         timings.append( interval )
         print( "|--- Time required for changing A to PAP: ", np.round( interval, 5 ), "ms---|" )
-        #/
+        #
         # Solve either iteratively using CG or exactly
         start3 = time.time()
         if iterative_inversion >= 0:
@@ -792,6 +788,9 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
           p_k = self.epsilon * inverse
           p_k = p_k.reshape( ( p_k.shape[0], 1 ) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
         else:
+          # Preconditioning along null vector                                     
+          vector = vector.reshape( (len(vector), 1) )
+          matrix = matrix + np.dot( vector, vector.T )     
           # Preconditioning for exact inversion
           B = np.dot( Ay, z.T )
           C = z @ np.dot( y.T, Ay ) @ z.T
@@ -805,7 +804,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
         start4 = time.time()
         # Unwind
         for transform in unwinding_transformations:
-          p_k = transform(p_k)
+          p_k = transform( p_k )
         end = time.time()
         interval = 1e3 * ( end - start4 )
         timings.append( interval )
@@ -848,20 +847,16 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
         timings = []
         start = time.time()
         # Record list of unwinding transformations on final result
-        unwinding_transformations = []  
+        unwinding_transformations = [] 
         # Construct modified Hessian
         diag = 1/np.sqrt( np.diag(unnormalized_Hessian).flatten() )
         self.modified_Hessian = diag[:,None] * unnormalized_Hessian * diag[None,:]        
         # Dummy variable to work on
         matrix = self.modified_Hessian
-        # Preconditioning along null vector
         vector = self.null_vector# Shape: (n,)
         vector = vector/diag
         vector = vector/np.linalg.norm( vector )
         vector_E = vector
-        if iterative_inversion < 0:
-          vector = vector.reshape( (len(vector), 1) )
-          matrix = matrix + np.dot( vector, vector.T )                                                    
         # Transformations (Initial on gradient and final on result)
         gradient = diag[:,None] * gradient[:,None]
         unwinding_transformations.append( lambda x : diag[:,None] * x )
@@ -888,12 +883,12 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
         interval = 1e3 * ( end - start0 )
         timings.append( interval )
 
-        # Changing the A matrix to PAP
+        #Changing the A matrix to PAP
         start2 = time.time()
 
         # Function mapping v to Pv
         # P = Id + z*y.T
-        def _apply_P( vector):
+        def _apply_P( vector ):
           return vector + z @ ( y.T @ vector )
         # Function mapping v to P(A+E)Pv
         # A is matrix
@@ -908,13 +903,12 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
         # At the end 
         gradient = _apply_P( gradient )
         unwinding_transformations.append( lambda x : _apply_P(x) )
-        end      = time.time()
+        end = time.time()
         interval = 1e3 * ( end - start2 )
         timings.append( interval )  
         #
         # Solve either iteratively using CG or exactly
         start3 = time.time()
-       
         if iterative_inversion >= 0:
           self.m  = matrix
           A = scipy.sparse.linalg.LinearOperator( ( self.m.shape[0], self.m.shape[1] ), matvec = _preconditioned_map ) 
@@ -937,6 +931,9 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
           p_k = self.epsilon * inverse
           p_k = p_k.reshape( ( p_k.shape[0], 1 ) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
         else:
+          # Preconditioning along null vector                                     
+          vector = vector.reshape( (len(vector), 1) )
+          matrix = matrix + np.dot( vector, vector.T )                                                    
           # Preconditioning for exact inverse 
           B = np.dot( Ay, z.T )
           C = z @ np.dot( y.T, Ay ) @ z.T
@@ -983,7 +980,6 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
                       -- Conjugate Gradient- 'cg' : scipy.sparse.linalg.cg
                       -- GMRES- 'gmres' : scipy.sparse.linalg.gmres
                       
-
         Returns:
         --------
         Returns a dictionary where the keys are strings and corresponding list of values obtained over the iteration of the algorithm.
@@ -1001,7 +997,6 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
             timings : list
                       The list of timestamps recorded at various steps of the versions.
         """
-
         i = 1
         while True: 
             # Compute gradient w.r.t f:
@@ -1067,7 +1062,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
             end = time.time()
             self.alpha_list.append( alpha )
             # Update f and g:
-            self.f = self.f + alpha * p_k
+            self.f = self.f + alpha * p_k# Shape: (n,)
             self.g = self._get_g( self.C - self.f[:,None] )# Shape: (m,)
             self.z = ( self.C - self.f[:,None] - self.g[None,:] )# Shape : (n,m)
             P = self.a[:,None] * ( np.exp( - self.z/self.epsilon ) ) * self.b[None,:]# Shape : (n,m)
@@ -1084,7 +1079,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
             else:   
                 print( "Terminating after iteration: ", i )
                 break  
-        # end for                                                                                                            
+        # end for           
         return {
             "potential_f"       : self.f + self.epsilon * np.log( self.a ),
             "potential_g"       : self.g + self.epsilon * np.log( self.b ),
@@ -1092,5 +1087,4 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
             "objectives"        : self.objvalues,
             "linesearch_steps"  : self.alpha_list,
             "timings"           : self.timing,
-
         }

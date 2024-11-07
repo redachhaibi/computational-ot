@@ -683,14 +683,11 @@ class damped_Newton_with_preconditioning:
         self.modified_Hessian = diag[:,None] * unnormalized_Hessian * diag[None,:]
         # Dummy variable to work on
         matrix = self.modified_Hessian
-        # Preconditioning along null vector
-        vector = self.null_vector
+        matrix = self.modified_Hessian
+        vector = self.null_vector# Shape: (n,)
         vector = vector/diag
         vector = vector/np.linalg.norm( vector )
         vector_E = vector
-        if iterative_inversion < 0:
-          vector = vector.reshape( ( len(vector), 1 ) )
-          matrix = matrix + np.dot( vector, vector.T )
         # Transformations (Initial on gradient and final on result)
         gradient = diag[:,None] * gradient[:,None]
         unwinding_transformations.append( lambda x : diag[:,None] * x )
@@ -771,6 +768,10 @@ class damped_Newton_with_preconditioning:
           p_k = self.epsilon * inverse
           p_k = p_k.reshape( ( p_k.shape[0], 1 ) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
         else:
+          # Preconditioning along null vector                                     
+          vector = vector.reshape( (len(vector), 1) )
+          matrix = matrix + np.dot( vector, vector.T )  
+          # Preconditioning for exact inversion
           B = np.dot( Ay, z.T )
           C = z @ np.dot( y.T, Ay ) @ z.T
           matrix = matrix + B + B.T + C
@@ -830,15 +831,12 @@ class damped_Newton_with_preconditioning:
         self.modified_Hessian = diag[:,None] * unnormalized_Hessian * diag[None,:]        
         # Dummy variable to work on
         matrix = self.modified_Hessian
-        # Preconditioning along null vector
-        vector = self.null_vector
+        # Dummy variable to work on
+        matrix = self.modified_Hessian
+        vector = self.null_vector# Shape: (n,)
         vector = vector/diag
         vector = vector/np.linalg.norm( vector )
         vector_E = vector
-        if iterative_inversion < 0:
-          vector = vector.reshape( ( len(vector), 1 ) )
-          matrix = matrix + np.dot( vector, vector.T )
-
         # Transformations (Initial on gradient and final on result)
         gradient = diag[:,None] * gradient[:,None]
         unwinding_transformations.append( lambda x : diag[:,None] * x )
@@ -916,6 +914,10 @@ class damped_Newton_with_preconditioning:
           p_k = self.epsilon * inverse
           p_k = p_k.reshape( ( p_k.shape[0], 1 ) ) # For some reason, this outputs (n,) and the next line outputs (n,1)
         else:
+          # Preconditioning along null vector                                     
+          vector = vector.reshape( (len(vector), 1) )
+          matrix = matrix + np.dot( vector, vector.T )           
+          # Preconditioning for exact inversion
           B = np.dot( Ay, z.T )
           C = z @ np.dot( y.T, Ay ) @ z.T
           matrix = matrix + B + B.T + C
@@ -979,7 +981,7 @@ class damped_Newton_with_preconditioning:
             timings : list
                       The list of timestamps recorded at various steps of the versions.
         """
-        i = 0
+        i = 1
         while True :
             # Compute gradient    
             grad_f = self._computegradientf(self.x[:self.a.shape[0]])
@@ -1091,6 +1093,6 @@ class damped_Newton_with_preconditioning:
           "error_b"          : self.err_b,
           "objective_values" : self.objvalues,
           "linesearch_steps" : self.alpha,
-          "timings"          : self.timing
+          "timings"          : self.timing,
           }
 
