@@ -6,7 +6,7 @@ class semi_dual_dampedNewton_np:
         Parameters:
         -----------
             C : ndarray, shape (n,m), 
-                It is the cost matrix between the points of the sample point clouds.
+                It is the cost matrix between the points sampled from the point clouds.
             a : ndarray, shape (n,)
                 The probability histogram of the sample of size n.
             b : ndarray, shape (m,)
@@ -69,7 +69,7 @@ class semi_dual_dampedNewton_np:
     
     def _get_g( self, H ):
       """
-        Here we computing g.
+        Here we compute g.
         Parameters:
         -----------
             H : ndarray, shape (n,m)
@@ -99,7 +99,7 @@ class semi_dual_dampedNewton_np:
             ndarray, shape (m,)
             The value of potential g.
         """
-        return -self.epsilon * np.log( np.sum( self.a[:,None] * np.exp( -H/self.epsilon ), 0 ) )# Shape: (m,)
+        return -self.epsilon * np.log( np.sum( self.a[:,None] * np.exp( -H/self.epsilon ), axis = 0 ) )# Shape: (m,)
     
     def _explog_g( self, H ):
         """
@@ -115,9 +115,8 @@ class semi_dual_dampedNewton_np:
             The exp-log regularized value of potential g.
 
         """
-        return self._g( H - np.min( H, 0 ) ) + np.min( H, 0 )# Shape: (m,)
+        return self._g( H - np.min( H, axis = 0 ) ) + np.min( H, axis = 0 )# Shape: (m,)
             
-   
     def _wolfe1( self, alpha, p, slope ):
         #Armijo Condition
         """

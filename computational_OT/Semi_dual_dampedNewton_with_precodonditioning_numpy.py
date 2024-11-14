@@ -2,14 +2,14 @@ import numpy as np
 import scipy
 import time
 
-class semi_dual_dampedNewton_with_precodonditioning_np:
-    def __init__( self,  C, a, b, f, epsilon, rho, c, null_vector, precond_vectors, exp_log = "True" ):
+class semi_dual_dampedNewton_with_preconditioning_np:
+    def __init__( self, C, a, b, f, epsilon, rho, c, null_vector, precond_vectors, exp_log = "True" ):
         """
         
         Parameters:
         -----------
             C : ndarray, shape (n,m), 
-                It is the cost matrix between the points of the sample point clouds.
+                It is the cost matrix between the points sampled from the point clouds.
             a : ndarray, shape (n,)
                 The probability histogram of the sample of size n.
             b : ndarray, shape (m,)
@@ -25,7 +25,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
             null_vector : ndarray, shape (n,)
                           The null vector of the Hessian to be used for null vector preconditioning .
             precond_vectors : list of ndarrays, shape (n,)
-                              The stack of preconditioning vectors of shape obtained from the Hessian at optimum obtained from the algorithm without any preconditioning,
+                              The stack of preconditioning vectors obtained from the Hessian at the optimum obtained from the algorithm without any preconditioning,
                               that is, semi-dual damped Newton with only null vector preconditioning and exact inversion.
             exp_log : bool
                       Indicating to use exp-log regularization or not.
@@ -78,7 +78,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
     
     def _get_g( self, H ):
       """ 
-        Here we computing g.
+        Here we compute g.
         Parameters:
         -----------
             H : ndarray, shape (n,m)
@@ -108,7 +108,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
             ndarray, shape (m,)
             The value of potential g.
         """
-        return -self.epsilon * np.log( np.sum( self.a[:,None] * np.exp( -H/self.epsilon ), 0 ) )# Shape: (m,)
+        return -self.epsilon * np.log( np.sum( self.a[:,None] * np.exp( -H/self.epsilon ), axis = 0 ) )# Shape: (m,)
     
     def _explog_g( self, H ):
         """
@@ -124,7 +124,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
             The exp-log regularized value of potential g.
 
         """
-        return self._g( H - np.min( H, 0 ) ) + np.min( H, 0 )# Shape: (m,)
+        return self._g( H - np.min( H, axis = 0 ) ) + np.min( H, axis = 0 )# Shape: (m,)
    
     def _wolfe1( self, alpha, p, slope ):
         #Armijo Condition
@@ -154,7 +154,6 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
                 break
         return alpha
         
-          
     def _precond_inversion_v0( self,  unnormalized_Hessian, gradient, iterative_inversion, debug ):
         """
 
@@ -965,7 +964,7 @@ class semi_dual_dampedNewton_with_precodonditioning_np:
             maxiter : int
                       The maximum iteration for the optimization algorithm. Defaults to 100.
             iterative_inversion : int
-                                  The number of iterative inversions to be performed to obtain the inverse of the Hessian followed by obtaining the ascent diorection.
+                                  The number of iterative inversions to be performed to obtain the inverse of the Hessian followed by obtaining the ascent direction.
                                   Defaults to -1, which indicates exact inversion.
             relative_tol :  float
                             The value of the hyperparameter relative tolerance of the iterative inversion algorithm, which here is conjugate gradient or GMRES.
