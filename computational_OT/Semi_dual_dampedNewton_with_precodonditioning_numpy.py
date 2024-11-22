@@ -451,7 +451,7 @@ class semi_dual_dampedNewton_with_preconditioning_np:
         # Compute P_matrix = id + y*diag(values)*y.T
         values = ( ( 1/(np.sqrt(eigenvalues) ) ) - 1 )# Vector of size k
         z = y * values[None,:]
-        P_matrix = ( 1/np.sqrt(2) ) * ( np.identity( n ) + np.dot( z, y.T ) )
+        P_matrix = np.identity( n ) + np.dot( z, y.T )
         # Old version
         # P_matrix = np.identity(n)
         # for i in range(k):
@@ -790,7 +790,7 @@ class semi_dual_dampedNewton_with_preconditioning_np:
           # Preconditioning along null vector                                     
           vector = vector.reshape( (len(vector), 1) )
           matrix = matrix + np.dot( vector, vector.T )     
-          # Preconditioning for exact inversion
+          # True Preconditioning for exact inverse 
           B = np.dot( Ay, z.T )
           C = z @ np.dot( y.T, Ay ) @ z.T
           matrix = matrix + B + B.T + C
@@ -933,7 +933,7 @@ class semi_dual_dampedNewton_with_preconditioning_np:
           # Preconditioning along null vector                                     
           vector = vector.reshape( (len(vector), 1) )
           matrix = matrix + np.dot( vector, vector.T )                                                    
-          # Preconditioning for exact inverse 
+          # True Preconditioning for exact inverse 
           B = np.dot( Ay, z.T )
           C = z @ np.dot( y.T, Ay ) @ z.T
           matrix = matrix + B + B.T + C
