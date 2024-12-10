@@ -44,7 +44,6 @@ class semi_dual_dampedNewton_with_preconditioning_np:
         self.err = []
         self.objvalues = [] 
         self.timing = []
-        self.out = []
         self.g = self._get_g( self.C - self.f[:,None] )# Shape: (m,)
         self.z = self.C - self.f[:,None] - self.g[None,:]# Shape: (n,m)
 
@@ -59,7 +58,7 @@ class semi_dual_dampedNewton_with_preconditioning_np:
         Returns: 
         --------
             Q_semi(f) : float
-                        The value of semi-dual objective function obtained by evaluating the formula Q_semi(f) = < f, a > + < g( f, C, epsilon ), b >,
+                        The value of semi-dual objective function obtained by evaluating Q_semi(f) = < f, a > + < g( f, C, epsilon ), b >,
                         where g( f, C, epsilon ) denotes the value of Kantorovich potential g evaluated using the Schrodinger-bridge equations between f and g.
         """
         g = self._get_g( self.C - f[:,None] )# Shape: (m,)
@@ -518,7 +517,7 @@ class semi_dual_dampedNewton_with_preconditioning_np:
         print( "|--- Time taken to invert the linear system for p_k: ", np.round( interval, 5 ), "ms---|" )
 
         start5 = time.time()
-        # Unwind
+        # Unwind 
         for transform in unwinding_transformations:
           P, f = transform
           p_k = f(P, p_k)
@@ -981,7 +980,7 @@ class semi_dual_dampedNewton_with_preconditioning_np:
                       
         Returns:
         --------
-        Returns a dictionary where the keys are strings and corresponding list of values obtained over the iteration of the algorithm.
+        Returns a dictionary where the keys are strings and corresponding values obtained over the iteration of the algorithm.
         The following are the keys of the dictionary and the descriptions of their values:
             potential_f : ndarray, shape: (n,)
                           The optimal potential f.
