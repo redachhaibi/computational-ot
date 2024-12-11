@@ -10,8 +10,7 @@ class damped_Newton_with_preconditioning:
         Parameters:
         -----------
             C : ndarray, shape (n,m), 
-                n and m are the sizes of the samples from the two point clouds.
-                It is the cost matrix between the sample points of the two point clouds.
+                It is the cost matrix between the points sampled from the point clouds.
             a : ndarray, shape (n,)
                 The probability histogram of the sample of size n.
             b : ndarray, shape (m,)
