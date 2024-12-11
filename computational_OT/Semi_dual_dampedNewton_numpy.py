@@ -1,6 +1,6 @@
 import numpy as np
 class semi_dual_dampedNewton_np:
-    def __init__( self, C, a, b, f, epsilon, rho, c, exp_log = 'True' ):
+    def __init__( self, C, a, b, f, epsilon, rho, c, log_exp = 'True' ):
         """
         
         Parameters:
@@ -29,7 +29,7 @@ class semi_dual_dampedNewton_np:
         self.rho = rho
         self.epsilon = epsilon  
         self.c = c
-        self.exp_log = exp_log
+        self.log_exp = log_exp
         self.alpha_list = []
         self.err = []
         self.objvalues = [] 
@@ -79,9 +79,9 @@ class semi_dual_dampedNewton_np:
             ndarray, shape (m,)
             The value of potential g.
       """
-      if self.exp_log :
+      if self.log_exp :
         # With exp-log regularization
-        g = self._explog_g( H )# Shape: (m,)
+        g = self._logexp_g( H )# Shape: (m,)
       else:
         # Without exp-log regularization
         g = self._g( H )# Shape: (m,)
@@ -101,7 +101,7 @@ class semi_dual_dampedNewton_np:
         """
         return -self.epsilon * np.log( np.sum( self.a[:,None] * np.exp( -H/self.epsilon ), axis = 0 ) )# Shape: (m,)
     
-    def _explog_g( self, H ):
+    def _logexp_g( self, H ):
         """
         Here we incorporate the exp-log regularization method in the computation of the potential g.
         Parameters:
